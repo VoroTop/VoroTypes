@@ -10,6 +10,8 @@ Requires pymatgen for space group analysis.
 """
 
 import numpy as np
+from pymatgen.core import Structure, Lattice
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 
 class SiteSymmetry:
@@ -320,14 +322,6 @@ def compute_site_symmetry(crystal, central_idx, coords, degen_vertices,
     SiteSymmetry or None
         None if pymatgen is not available or symmetry computation fails.
     """
-    try:
-        from pymatgen.core import Structure, Lattice
-        from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-    except ImportError:
-        if verbose:
-            print("pymatgen not available; skipping symmetry reduction")
-        return None
-
     if not degen_vertices:
         return None
 

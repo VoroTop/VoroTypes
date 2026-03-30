@@ -359,20 +359,12 @@ class Crystal:
     def from_file(cls, filename):
         """Load crystal structure from a file.
 
-        Supports CIF files natively (no external dependencies).
-        For POSCAR and other formats, falls back to pymatgen if available.
+        Supports CIF files natively and POSCAR/other formats via pymatgen.
         """
         if filename.lower().endswith('.cif'):
             return cls._from_cif(filename)
-        # Non-CIF formats: try pymatgen
-        try:
-            from pymatgen.core import Structure
-        except ImportError:
-            raise ImportError(
-                f"Reading '{filename}' requires pymatgen. "
-                "Install it with: pip install pymatgen\n"
-                "CIF files can be read without pymatgen."
-            )
+        # Non-CIF formats: use pymatgen
+        from pymatgen.core import Structure
         struct = Structure.from_file(filename)
         return cls(
             struct.lattice.matrix,
