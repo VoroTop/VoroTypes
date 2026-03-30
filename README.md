@@ -217,9 +217,6 @@ the reference structure matches the one used in your simulation.
 
 ### Publications
 
-* Lazar, E.A., *Enumerating Voronoi cell topologies of crystals under
-  perturbation* (in preparation).
-
 * Lazar, E.A., Han, J., and Srolovitz, D.J., "A Topological Framework
   for Local Structure Analysis in Condensed Matter,"
   [Proc. Natl. Acad. Sci. 112:E5769](https://www.pnas.org/doi/10.1073/pnas.1505788112),
