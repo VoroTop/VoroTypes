@@ -22,6 +22,7 @@ topologies. VoroTypes finds all of them.
 * [Quick Start](#quick-start)
 * [Options](#options)
 * [Examples](#examples)
+* [Pre-computed Filters](#pre-computed-filters)
 * [Filter File Format](#filter-file-format)
 * [Limitations](#limitations)
 * [Publications](#publications)
@@ -154,6 +155,14 @@ near-equidistant atoms into play:
 ```bash
 python enumerate_cells.py examples/TaN_mp-1279.cif --near-gap-threshold 0.01
 ```
+
+---
+
+### Pre-computed Filters
+
+A library of pre-computed filter files for 779 structures from the
+[Materials Project](https://materialsproject.org/) is available at
+[vorotop.org/filter-library](https://www.vorotop.org/filter-library.html).
 
 ---
 
