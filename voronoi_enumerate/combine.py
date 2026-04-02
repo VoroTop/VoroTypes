@@ -385,6 +385,24 @@ def enumerate_cell_types_v2(vertices, central_idx, coords, verbose=True,
     # So prefer orderly whenever symmetry is available, using the
     # symmetry-reduced estimate for the threshold.
     orderly_threshold = 10_000_000
+    # When no symmetry was found, build a trivial (identity-only)
+    # SiteSymmetry so we can use the orderly DFS path, which has
+    # O(depth) memory instead of O(product) memory.
+    if symmetry is None and vertex_options:
+        from .symmetry import SiteSymmetry
+        d = len(vertex_options)
+        identity_vperm = list(range(d))
+        identity_rperm = [list(range(len(opts))) for opts in vertex_options]
+        all_star_atoms = set()
+        for tets, _ in ((t, u) for opts in vertex_options for t, u in opts):
+            for tet in tets:
+                all_star_atoms.update(tet)
+        for tet in generic_tets:
+            all_star_atoms.update(tet)
+        identity_aperm = {a: a for a in all_star_atoms}
+        symmetry = SiteSymmetry([identity_vperm], [identity_rperm],
+                                [identity_aperm])
+
     if symmetry is not None:
         # Symmetry reduces effective combos by ~group order; with
         # validity pruning the reduction is even larger.
