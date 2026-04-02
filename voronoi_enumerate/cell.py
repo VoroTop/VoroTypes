@@ -109,8 +109,8 @@ def _trace_cycle(adj, n):
     """
     if n < 3:
         return None
-    for node, nbrs in adj.items():
-        if len(nbrs) != 2:
+    for node in range(n):
+        if len(adj[node]) != 2:
             return None
 
     # Start: pick node 0, go to its first neighbor
