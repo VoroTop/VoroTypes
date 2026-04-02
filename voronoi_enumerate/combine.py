@@ -377,15 +377,10 @@ def enumerate_cell_types_v2(vertices, central_idx, coords, verbose=True,
     # ------------------------------------------------------------------
     # Step 2: Enumerate using the best available strategy
     # ------------------------------------------------------------------
-    total_combos = prod(len(opts) for opts in vertex_options) if vertex_options else 1
-
-    # Choose enumeration strategy.  Orderly generation uses constant
-    # memory per combo (DFS), while incremental construction builds a
-    # dictionary of all unique intermediate stars that can blow up memory.
-    # So prefer orderly whenever symmetry is available, using the
-    # symmetry-reduced estimate for the threshold.
-    orderly_threshold = 10_000_000
-    # When no symmetry was found, build a trivial (identity-only)
+    # Choose enumeration strategy.  Orderly generation uses O(depth)
+    # memory (DFS), while incremental construction builds a dictionary
+    # of all unique intermediate stars that can blow up memory.
+    # Always prefer orderly; when no symmetry was found, build a trivial
     # SiteSymmetry so we can use the orderly DFS path, which has
     # O(depth) memory instead of O(product) memory.
     if symmetry is None and vertex_options:
@@ -404,17 +399,6 @@ def enumerate_cell_types_v2(vertices, central_idx, coords, verbose=True,
                                 [identity_aperm])
 
     if symmetry is not None:
-        # Symmetry reduces effective combos by ~group order; with
-        # validity pruning the reduction is even larger.
-        effective_combos = total_combos // max(symmetry.order, 1)
-        if has_coupling:
-            orderly_threshold = 10**18  # effectively unlimited
-    else:
-        effective_combos = total_combos
-        if has_coupling:
-            orderly_threshold = 10**18
-
-    if symmetry is not None and effective_combos <= orderly_threshold:
         # Orderly generation: branch-and-bound DFS producing only canonical
         # combos.  Strictly faster than exhaustive iteration for symmetry
         # groups of moderate order (e.g. 2.4x for FCC with |Oh|=48).
