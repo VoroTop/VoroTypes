@@ -90,23 +90,3 @@ def write_filter_file(filepath, crystal_name, per_atom_types, species=None,
                 f.write(f"{i + 1}\t({wv_str})\n")
 
     return total_wv, len(groups)
-
-
-def write_intractable_filter(filepath, crystal_name, reason):
-    """Write a filter file indicating that analytical enumeration is intractable.
-
-    Parameters
-    ----------
-    filepath : str
-        Output file path.
-    crystal_name : str
-        Crystal structure name.
-    reason : str
-        Brief explanation of why enumeration is intractable.
-    """
-    label = crystal_name
-    with open(filepath, 'w') as f:
-        f.write(f"#\t{label} filter — INTRACTABLE\n")
-        f.write(f"#\tAnalytical enumeration was not feasible: {reason}\n")
-        f.write(f"#\tUse VoroTop -mf to generate a stochastic filter instead.\n")
-        f.write(f"#\tExample: VoroTop structure.xyz -mf 100000 0.0001\n")

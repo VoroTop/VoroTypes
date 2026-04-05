@@ -7,10 +7,12 @@ Usage:
     python enumerate_cells.py a15 --atoms 0 2
     python enumerate_cells.py structure.cif
     python enumerate_cells.py POSCAR --atoms 0
+    python enumerate_cells.py structure.cif --max-memory 8
 """
 
 import sys
 import time
+import resource
 from math import prod
 import numpy as np
 from voronoi_enumerate.crystal import Crystal
@@ -77,6 +79,19 @@ def _omega(a=1.0):
         [2.0/3, 1.0/3, 0.5],
     ]
     return Crystal(lattice, frac_coords, ['A', 'A', 'A'])
+
+
+MAX_MEMORY_GB = 4  # default memory limit (GB)
+
+
+def set_memory_limit(gb):
+    """Set a hard address-space limit.  Allocations beyond this raise MemoryError."""
+    limit_bytes = int(gb * 1024 ** 3)
+    try:
+        resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, limit_bytes))
+    except (ValueError, resource.error) as e:
+        print(f"Warning: could not set memory limit ({e}). "
+              f"Memory will not be capped.", file=sys.stderr)
 
 
 CRYSTALS = {
@@ -255,6 +270,13 @@ if __name__ == '__main__':
         idx = sys.argv.index('--near-gap-threshold')
         if idx + 1 < len(sys.argv):
             near_gap_threshold = float(sys.argv[idx + 1])
+
+    max_memory = MAX_MEMORY_GB
+    if '--max-memory' in sys.argv:
+        idx = sys.argv.index('--max-memory')
+        if idx + 1 < len(sys.argv):
+            max_memory = float(sys.argv[idx + 1])
+    set_memory_limit(max_memory)
 
     if name in CRYSTALS:
         run(name, atom_indices=atom_indices, legacy=legacy,
