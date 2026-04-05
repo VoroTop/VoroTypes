@@ -79,6 +79,7 @@ python enumerate_cells.py <structure.cif> [options]
 | `--all-types` | Include partially resolved cell types (cells with some degenerate vertices left unresolved). |
 | `-j N` | Use N parallel worker processes. |
 | `--near-gap-threshold T` | Include near-equidistant atoms within a relative gap of T (see [Limitations](#limitations)). |
+| `--max-memory G` | Set memory limit in GB (default: 4). Aborts with a clear message if exceeded. |
 | `--legacy` | Use the legacy Cartesian-product enumeration algorithm. |
 
 ---
