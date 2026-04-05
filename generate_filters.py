@@ -9,6 +9,8 @@ import os
 import time
 import traceback
 import json
+import resource
+import argparse
 import numpy as np
 from math import prod
 from collections import defaultdict
@@ -33,8 +35,8 @@ CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "filters", "mp_structures.json")
 MAX_RES_PER_VERTEX = 50   # skip if any vertex has more resolutions
 MAX_TOTAL_COMBOS = 1_000_000  # skip if product of resolutions exceeds this
-MAX_ENUM_TIME = 300        # timeout (seconds)
-N_WORKERS = 1  # single-threaded so signal.alarm timeout works
+MAX_MEMORY_GB = 4          # default memory limit per structure (GB)
+N_WORKERS = 1
 TARGET_COUNT = 1000
 
 
@@ -240,13 +242,45 @@ def run_structure(name, cryst, atom_gap_info=None):
     return n_wv, n_groups
 
 
+def get_memory_gb():
+    """Return current RSS memory usage in GB."""
+    # ru_maxrss is in bytes on Linux, kilobytes on macOS
+    ru = resource.getrusage(resource.RUSAGE_SELF)
+    if sys.platform == 'darwin':
+        return ru.ru_maxrss / (1024 ** 3)
+    else:
+        return ru.ru_maxrss / (1024 ** 2)
+
+
+def set_memory_limit(gb):
+    """Set a hard address-space limit.  Allocations beyond this raise MemoryError."""
+    limit_bytes = int(gb * 1024 ** 3)
+    # RLIMIT_AS (address space) is the portable way to cap memory;
+    # exceeding it makes malloc return NULL, which Python turns into MemoryError.
+    try:
+        resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, limit_bytes))
+    except (ValueError, resource.error) as e:
+        print(f"Warning: could not set memory limit ({e}). "
+              f"Memory will not be capped.", file=sys.stderr)
+
+
 def main():
+    parser = argparse.ArgumentParser(
+        description="Generate VoroTop filter files for crystal structures.")
+    parser.add_argument('--max-memory', type=float, default=MAX_MEMORY_GB,
+                        help=f"Memory limit in GB (default: {MAX_MEMORY_GB})")
+    args = parser.parse_args()
+
+    max_mem_gb = args.max_memory
+    set_memory_limit(max_mem_gb)
+
     os.makedirs(FILTER_DIR, exist_ok=True)
 
     structures = load_structures()
     print(f"\nStructures to process: {len(structures)}")
     print(f"Filter directory: {FILTER_DIR}")
     print(f"Max resolutions per vertex: {MAX_RES_PER_VERTEX}")
+    print(f"Memory limit: {max_mem_gb:.1f} GB")
     print(f"Workers: {N_WORKERS}")
     print(f"{'=' * 80}\n")
     sys.stdout.flush()
@@ -313,14 +347,8 @@ def main():
             sys.stdout.flush()
             continue
 
-        # Run enumeration with signal-based timeout (single-threaded)
-        import signal
-        def _timeout_handler(signum, frame):
-            raise TimeoutError("timeout")
+        # Run enumeration
         try:
-            old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-            signal.alarm(MAX_ENUM_TIME)
-
             t0 = time.time()
             # Collect per-atom gap info from probe results
             atom_gap_info = {}
@@ -332,11 +360,9 @@ def main():
                                            atom_gap_info=atom_gap_info)
             elapsed = time.time() - t0
 
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
-
             results.append((name, formula, sg, n_groups, n_wv, elapsed))
 
+            mem_gb = get_memory_gb()
             if (i + 1) % 10 == 0 or elapsed > 10:
                 degen_info = ", ".join(
                     f"{a['n_degen']}dg" for a in atom_summaries
@@ -345,27 +371,25 @@ def main():
                     degen_info = "no degen"
                 print(f"[{i+1}/{len(structures)}] {mid} {formula:12s} "
                       f"SG {sg:12s}  {n_groups:2d} grp  {n_wv:5d} WV  "
-                      f"{elapsed:6.1f}s  ({degen_info})")
+                      f"{elapsed:6.1f}s  {mem_gb:.1f}GB  ({degen_info})")
                 sys.stdout.flush()
 
-        except TimeoutError:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
+        except MemoryError:
             elapsed = time.time() - t0
+            mem_gb = get_memory_gb()
             skipped.append((name, formula, sg, max_combos))
             print(f"[{i+1}/{len(structures)}] {mid} {formula:12s} "
-                  f"SG {sg:12s}  TIMEOUT after {elapsed:.0f}s")
+                  f"SG {sg:12s}  OUT OF MEMORY after {elapsed:.0f}s "
+                  f"({mem_gb:.1f}GB)")
             sys.stdout.flush()
-            # Replace any partial output with an intractable marker
             partial = os.path.join(FILTER_DIR, f"{name}.filter")
             if os.path.exists(partial):
                 os.remove(partial)
             write_intractable_filter(
                 filter_path, name,
-                f"enumeration timed out after {elapsed:.0f}s")
+                f"exceeded {max_mem_gb:.0f}GB memory limit "
+                f"after {elapsed:.0f}s")
         except Exception as e:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
             failed.append((name, formula, sg, str(e)[:80]))
             if len(failed) <= 10:
                 print(f"[{i+1}/{len(structures)}] {mid} {formula:12s} "

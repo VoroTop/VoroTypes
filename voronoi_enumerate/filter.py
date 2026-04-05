@@ -35,7 +35,7 @@ def write_filter_file(filepath, crystal_name, per_atom_types, species=None,
         Minimum relative gap to nearest non-equidistant atom across all
         vertices and atoms.  Used to warn about near-equidistant neighbors.
     """
-    label = crystal_name.upper()
+    label = crystal_name
 
     # Group atoms that produce identical Weinberg vector sets
     groups = []  # list of (atom_indices, cell_types_dict, wv_frozenset)
@@ -104,7 +104,7 @@ def write_intractable_filter(filepath, crystal_name, reason):
     reason : str
         Brief explanation of why enumeration is intractable.
     """
-    label = crystal_name.upper()
+    label = crystal_name
     with open(filepath, 'w') as f:
         f.write(f"#\t{label} filter — INTRACTABLE\n")
         f.write(f"#\tAnalytical enumeration was not feasible: {reason}\n")

@@ -133,14 +133,19 @@ def _precompute_compatibility(generic_tets, vertex_options, central_idx):
                 tets_j = vertex_options[vj][rj][0]
 
                 for a in shared:
-                    # Collect tets containing {central, a}
-                    face_tets = list(generic_by_nbr.get(a, []))
+                    # Collect tets containing {central, a}.
+                    # Use a set to deduplicate: two vertices may share
+                    # the same equidistant atom set and produce identical
+                    # tets.  The actual star construction uses frozenset
+                    # union which deduplicates, so the check must too.
+                    face_tets_set = set(generic_by_nbr.get(a, []))
                     for tet in tets_i:
                         if central_idx in tet and a in tet:
-                            face_tets.append(tet)
+                            face_tets_set.add(tet)
                     for tet in tets_j:
                         if central_idx in tet and a in tet:
-                            face_tets.append(tet)
+                            face_tets_set.add(tet)
+                    face_tets = list(face_tets_set)
 
                     if len(face_tets) < 2:
                         continue
