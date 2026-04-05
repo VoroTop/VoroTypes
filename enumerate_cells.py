@@ -110,7 +110,7 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
     t0 = time.time()
 
     cryst = CRYSTALS[name]()
-    print(f"Crystal: {name.upper()}")
+    print(f"Crystal: {name}")
     print(f"Atoms per unit cell: {cryst.n_atoms}")
     print(f"Species: {cryst.species}")
     print(f"Lattice:\n{cryst.lattice}\n")
@@ -229,7 +229,7 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
         per_atom_types.append((atom_idx, cell_types))
 
     # Write VoroTop filter file
-    filter_path = f"{name.upper()}.filter"
+    filter_path = f"{name}.filter"
     n_wv, n_groups = write_filter_file(
         filter_path, name, per_atom_types, species=cryst.species
     )
