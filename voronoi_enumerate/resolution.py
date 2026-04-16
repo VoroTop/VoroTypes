@@ -14,7 +14,7 @@ Legacy method: random perturbations + Delaunay triangulation (sampling).
 """
 
 import numpy as np
-from scipy.spatial import Delaunay
+from scipy.spatial import Delaunay, ConvexHull
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Dict, Tuple, FrozenSet
@@ -41,6 +41,7 @@ class Resolution:
     neighbors: List[int]
     face_valences: Dict[int, int]
     n_triangulations: int = 1
+    is_primary: bool = True
 
 
 def _canonicalize(simplices) -> FrozenSet[Simplex]:
@@ -63,6 +64,68 @@ def _neighbors_of(star, v) -> List[int]:
 
 def _face_valence(star, central, neighbor) -> int:
     return sum(1 for s in star if central in s and neighbor in s)
+
+
+def _classify_primary(points, star_to_tris, all_tris):
+    """Classify which star types are primary via the projected GKZ
+    secondary polytope.
+
+    A triangulation is primary if its projected GKZ vector is a vertex
+    of the convex hull of all projected GKZ vectors in R^{k-4}.
+    A star type is primary if any of its triangulations is primary.
+    """
+    k = len(points)
+    A = np.column_stack([np.ones(k), points])
+    Q, _ = np.linalg.qr(A, mode='reduced')
+
+    tri_list = list(all_tris)
+    n_tris = len(tri_list)
+    gkz = np.zeros((n_tris, k))
+
+    for t_idx, tri in enumerate(tri_list):
+        for simplex in tri:
+            idx = list(simplex)
+            p = points[idx]
+            vol = abs(np.linalg.det(p[1:] - p[0]) / 6.0)
+            for i in idx:
+                gkz[t_idx, i] += vol
+
+    projected = gkz - gkz @ Q @ Q.T
+    mean = projected.mean(axis=0)
+    centered = projected - mean
+    U, S, Vt = np.linalg.svd(centered, full_matrices=False)
+    tol = 1e-10 * S[0] if len(S) > 0 and S[0] > 0 else 1e-10
+    rank = int(np.sum(S > tol))
+
+    if rank == 0:
+        return set(star_to_tris.keys())
+
+    coords = centered @ Vt[:rank].T
+
+    if rank == 1:
+        vals = coords[:, 0]
+        vmin, vmax = vals.min(), vals.max()
+        if abs(vmax - vmin) < 1e-12:
+            hull_idx = set(range(n_tris))
+        else:
+            hull_idx = set(np.where(np.abs(vals - vmin) < 1e-12)[0])
+            hull_idx |= set(np.where(np.abs(vals - vmax) < 1e-12)[0])
+    else:
+        hull = ConvexHull(coords)
+        hull_idx = set(hull.vertices)
+
+    tri_to_star = {}
+    for star, tri_keys in star_to_tris.items():
+        for tk in tri_keys:
+            tri_to_star[tk] = star
+
+    primary_stars = set()
+    for idx in hull_idx:
+        tri_key = tri_list[idx]
+        if tri_key in tri_to_star:
+            primary_stars.add(tri_to_star[tri_key])
+
+    return primary_stars
 
 
 def enumerate_resolutions(points, central=0, seed=42, verbose=False):
@@ -129,6 +192,10 @@ def enumerate_resolutions(points, central=0, seed=42, verbose=False):
         star = frozenset(s for s in simplices if central in s)
         star_to_tris[star].append(tri_key)
 
+    # Classify primary vs secondary via projected GKZ secondary polytope
+    primary_stars = _classify_primary(points, star_to_tris,
+                                      list(triangulations.keys()))
+
     # Build Resolution objects
     resolutions = []
     for star, tri_keys in star_to_tris.items():
@@ -140,6 +207,7 @@ def enumerate_resolutions(points, central=0, seed=42, verbose=False):
             neighbors=nbrs,
             face_valences=valences,
             n_triangulations=len(tri_keys),
+            is_primary=(star in primary_stars),
         ))
 
     resolutions.sort(key=lambda r: r.star)
