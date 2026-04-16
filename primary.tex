@@ -199,26 +199,29 @@ arise from $3^6 = 729$ combinations over the six unstable vertices.
 \subsection{SC cubic vertex ($k = 8$)}
 
 The eight atoms equidistant from a vertex of the simple cubic Voronoi
-cell form a cube.  There are 11{,}648~regular triangulations yielding
-544~star types.  The projected secondary polytope lives in
-$\R^{8-4} = \R^4$ and has \textbf{74~vertices}, corresponding to
-\textbf{59~primary star types} out of 544~total.
+cell form a cube.  There are 11{,}648~regular triangulations, but only
+152~distinct GKZ vectors and 544~star types.  The projected secondary
+polytope lives in $\R^{8-4} = \R^4$ and has \textbf{74~vertices}
+(out of 152 distinct GKZ points), corresponding to
+\textbf{256~primary star types} out of 544~total.  Note that multiple
+triangulations can share the same GKZ vector while having different
+stars; all stars associated with a vertex GKZ vector are primary.
 
-This yields a dramatic reduction in the combinatorial enumeration space.
-With 8~degenerate vertices per SC Voronoi cell:
+This yields a significant reduction in the combinatorial enumeration
+space.  With 8~degenerate vertices per SC Voronoi cell:
 \begin{center}
 \begin{tabular}{lcc}
   \hline
   & Resolutions/vertex & Total combinations \\
   \hline
   All types & 544 & $544^8 \approx 7.7 \times 10^{21}$ \\
-  Primary only & 59 & $59^8 \approx 1.5 \times 10^{14}$ \\
+  Primary only & 256 & $256^8 \approx 1.8 \times 10^{19}$ \\
   \hline
 \end{tabular}
 \end{center}
-The reduction factor is approximately $5 \times 10^7$.  With the
-$O_h$~point group symmetry ($|G| = 48$) and validity pruning, the
-primary enumeration becomes computationally feasible.
+The reduction factor is approximately $4 \times 10^2$.  While less
+dramatic than the FCC case, the $O_h$~point group symmetry ($|G| = 48$)
+and validity pruning provide further reduction.
 
 
 \begin{thebibliography}{9}
