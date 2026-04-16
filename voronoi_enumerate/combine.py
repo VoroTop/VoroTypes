@@ -260,7 +260,7 @@ def _classify_combo(combo, orbit_size, generic_tets, vertex_options,
 
 def enumerate_cell_types_v2(vertices, central_idx, coords, verbose=True,
                             include_degenerate=False, crystal=None,
-                            n_workers=1):
+                            n_workers=1, primary_only=False):
     """Enumerate all Voronoi cell types via incremental star construction.
 
     Algorithm:
@@ -313,6 +313,13 @@ def enumerate_cell_types_v2(vertices, central_idx, coords, verbose=True,
                                  if a != central_idx]
         pts = coords[order]
         resolutions, _ = enumerate_resolutions(pts, central=0)
+
+        if primary_only:
+            n_before = len(resolutions)
+            resolutions = [r for r in resolutions if r.is_primary]
+            if verbose:
+                print(f"  Vertex ({len(order)} atoms): "
+                      f"{len(resolutions)}/{n_before} primary resolutions")
 
         opts = []
         for res in resolutions:

@@ -106,7 +106,7 @@ CRYSTALS = {
 
 
 def run(name, atom_indices=None, legacy=False, all_types=False,
-        n_workers=1, near_gap_threshold=None):
+        n_workers=1, near_gap_threshold=None, primary_only=False):
     t0 = time.time()
 
     cryst = CRYSTALS[name]()
@@ -175,6 +175,7 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
                 include_degenerate=all_types,
                 crystal=cryst,
                 n_workers=n_workers,
+                primary_only=primary_only,
             )
 
             print(f"\n{'=' * 65}")
@@ -258,6 +259,7 @@ if __name__ == '__main__':
 
     legacy = '--legacy' in sys.argv
     all_types = '--all-types' in sys.argv
+    primary_only = '--primary' in sys.argv
 
     n_workers = 1
     if '-j' in sys.argv:
@@ -281,7 +283,8 @@ if __name__ == '__main__':
     if name in CRYSTALS:
         run(name, atom_indices=atom_indices, legacy=legacy,
             all_types=all_types, n_workers=n_workers,
-            near_gap_threshold=near_gap_threshold)
+            near_gap_threshold=near_gap_threshold,
+            primary_only=primary_only)
     elif os.path.isfile(name):
         # Load crystal structure from CIF, POSCAR, or other file
         cryst = Crystal.from_file(name)
@@ -289,7 +292,8 @@ if __name__ == '__main__':
         CRYSTALS[label] = lambda c=cryst: c
         run(label, atom_indices=atom_indices, legacy=legacy,
             all_types=all_types, n_workers=n_workers,
-            near_gap_threshold=near_gap_threshold)
+            near_gap_threshold=near_gap_threshold,
+            primary_only=primary_only)
     else:
         print(f"Unknown crystal: {name}")
         print(f"Built-in structures: {', '.join(CRYSTALS)}")

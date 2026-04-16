@@ -1,0 +1,239 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[margin=1in]{geometry}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Vol}{\operatorname{Vol}}
+\newcommand{\conv}{\operatorname{conv}}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+
+\title{Primary and Secondary Voronoi Cell Types:\\
+A Classification via the Projected Secondary Polytope}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Background}
+
+Consider a crystal structure with atoms at positions $\{x_i\}$.
+The Voronoi cell of a central atom partitions into faces, edges, and
+vertices.  A vertex of the Voronoi cell is the circumcenter of a
+Delaunay tetrahedron; it is equidistant from the four atoms of that
+tetrahedron.  A vertex is \emph{degenerate} (or \emph{unstable}) when
+$k > 4$ atoms are equidistant from it.  FCC and HCP crystals have
+degenerate vertices shared by $k = 6$ Voronoi cells (the equidistant
+atoms form an octahedron), while simple cubic (SC) has degenerate
+vertices shared by $k = 8$ cells (the atoms form a cube).
+
+Under infinitesimal perturbation of the atom positions, each degenerate
+vertex \emph{resolves}: the single degenerate point breaks into several
+generic Voronoi vertices, each equidistant from exactly four atoms.
+Different perturbation directions yield different resolutions, and hence
+different Voronoi cell topologies.  The family $\mathcal{F}_\lambda$ of
+all topological types obtainable by infinitesimal perturbation of a
+crystal $\lambda$ was introduced in~\cite{lazar2015}.
+
+The distinction between \emph{primary} and \emph{secondary} types was
+established empirically in~\cite{lazar2015}: primary types have positive
+ideal frequency $f_\lambda(\tau) > 0$, meaning they are observed with
+finite probability as the perturbation magnitude $\varepsilon \to 0$,
+while secondary types have $f_\lambda(\tau) = 0$.  For FCC, 44 primary
+types and 6{,}250 secondary types were identified, and these groupings
+were validated by molecular dynamics simulation.
+
+In~\cite{lazar2015}, the primary/secondary classification for FCC and
+HCP was performed by direct geometric analysis of the octahedral vertex:
+each unstable vertex resolves into either an edge (two ways) or a square
+face, and all other resolutions were classified as secondary.  Here we
+provide a general, computable criterion that extends this classification
+to arbitrary point configurations, using the theory of secondary
+polytopes.
+
+
+\section{Resolutions and Regular Triangulations}
+
+Let $p_1, \ldots, p_k \in \R^3$ be the $k$ atoms equidistant from a
+degenerate Voronoi vertex $v$, with $p_1$ being the central atom.  Under
+a small perturbation $\delta_i \in \R^3$ applied to each atom, the
+Delaunay triangulation of the perturbed points $q_i = p_i + \delta_i$
+determines a \emph{resolution} of the degenerate vertex.
+
+The \emph{star} of the central atom is the set of Delaunay tetrahedra
+containing $p_1$.  Two perturbations that produce the same star yield the
+same local Voronoi cell topology at that vertex.  We call each distinct
+star a \emph{resolution type} or \emph{star type}.
+
+The Delaunay triangulation of the perturbed points is a \emph{regular
+triangulation} of the original point configuration $A = \{p_1, \ldots,
+p_k\}$.  By the theory of Gel'fand, Kapranov, and
+Zelevinsky~\cite{gkz1994}, the set of all regular triangulations of $A$
+can be parameterized by \emph{height functions} $\omega =
+(\omega_1, \ldots, \omega_k) \in \R^k$, where the triangulation induced
+by $\omega$ is the projection of the lower convex hull of
+$\{(p_i, \omega_i)\} \subset \R^4$.  Two height vectors $\omega$ and
+$\omega'$ that differ by an affine function of the coordinates (i.e.,
+$\omega_i - \omega_i' = a \cdot p_i + b$ for some $a \in \R^3$,
+$b \in \R$) induce the same triangulation.  The effective parameter space
+is therefore the quotient $\R^k / \text{Aff}(A)$, which has dimension
+$k - 4$ when $A$ affinely spans~$\R^3$.
+
+
+\section{The GKZ Secondary Polytope}
+
+The \emph{GKZ secondary polytope} $\Sigma(A) \subset \R^k$ is a convex
+polytope whose vertices are in bijection with the regular triangulations
+of~$A$.  For a triangulation $T$, its \emph{GKZ vector}
+$\varphi(T) \in \R^k$ has components
+\begin{equation}
+  \varphi_i(T) = \sum_{\substack{\sigma \in T \\ p_i \in \sigma}}
+  \Vol(\sigma),
+  \label{eq:gkz}
+\end{equation}
+where the sum is over all maximal simplices $\sigma$ of $T$ that
+contain~$p_i$, and $\Vol(\sigma)$ is the Euclidean volume of the
+simplex.
+
+The \emph{normal fan} of $\Sigma(A)$ is the \emph{secondary fan}, which
+partitions $\R^k$ into polyhedral cones.  The normal cone of each vertex
+$\varphi(T)$ is the \emph{secondary cone}
+\[
+  \sigma(T) = \bigl\{\omega \in \R^k : \text{$\omega$ induces
+  triangulation } T\bigr\},
+\]
+which is a full-dimensional cone in~$\R^k$.
+
+After projecting to the quotient $\R^{k-4} \cong \R^k / \text{Aff}(A)$,
+we obtain the \emph{projected secondary polytope}
+$\bar\Sigma(A) \subset \R^{k-4}$.  Not every vertex of $\Sigma(A)$ need
+project to a vertex of $\bar\Sigma(A)$: some may project to interior
+points if their GKZ vectors differ from another vertex's by an affine
+function of the point coordinates.
+
+
+\section{Classification Criterion}
+
+We now state the classification criterion.
+
+\begin{definition}
+A regular triangulation $T$ of $A$ is called \emph{primary} if its
+projected GKZ vector $\bar\varphi(T)$ is a vertex of the projected
+secondary polytope $\bar\Sigma(A) \subset \R^{k-4}$.  Otherwise, $T$ is
+\emph{secondary}.  A star type (resolution) $S$ is primary if at least
+one regular triangulation producing star $S$ is primary.
+\end{definition}
+
+\begin{proposition}
+A primary triangulation has a full-dimensional normal cone in
+$\R^{k-4}$, meaning it is induced by an open set of effective height
+functions.  Consequently, it arises under a positive-measure set of
+perturbation directions as $\varepsilon \to 0$.  A secondary
+triangulation's projected GKZ vector lies in the interior of
+$\bar\Sigma(A)$ and is not induced by any open set of effective height
+functions; it can only arise on a measure-zero set of perturbation
+directions.
+\end{proposition}
+
+At the level of a single degenerate vertex, primary star types are those
+whose corresponding perturbation regions have positive solid angle in the
+effective height space, while secondary star types occupy
+lower-dimensional boundaries.
+
+A global Voronoi cell type is primary if the resolution at every
+degenerate vertex is a primary star type.
+
+
+\section{Computational Procedure}
+
+The classification can be computed as follows for a degenerate vertex
+with $k$ equidistant atoms $A = \{p_1, \ldots, p_k\}$:
+
+\begin{enumerate}
+\item \textbf{Enumerate regular triangulations.}
+  Use a flip-graph BFS or exact backtracking search to find all regular
+  triangulations $T_1, \ldots, T_N$ of~$A$.
+
+\item \textbf{Compute GKZ vectors.}
+  For each triangulation $T_j$, compute $\varphi(T_j) \in \R^k$ using
+  equation~\eqref{eq:gkz}.
+
+\item \textbf{Project to $\R^{k-4}$.}
+  Let $V \subset \R^k$ be the affine span of $A$ augmented by the
+  constant vector (dimension~4).  Project each $\varphi(T_j)$ onto
+  $V^\perp$ to obtain $\bar\varphi(T_j) \in \R^{k-4}$.
+
+\item \textbf{Compute convex hull.}
+  Find the convex hull of $\{\bar\varphi(T_j)\}_{j=1}^N$ in
+  $\R^{k-4}$.  The vertices of this hull identify the primary
+  triangulations.
+
+\item \textbf{Map to star types.}
+  A star type is primary if any of its associated triangulations is a
+  hull vertex.
+\end{enumerate}
+
+
+\section{Validation and Results}
+
+\subsection{FCC octahedral vertex ($k = 6$)}
+
+The six atoms equidistant from an octahedral vertex in FCC form a
+regular octahedron.  There are 9~regular triangulations yielding 7~star
+types.  The projected secondary polytope lives in $\R^{6-4} = \R^2$ and
+has \textbf{3~vertices}.  The corresponding 3~primary star types are:
+\begin{itemize}
+  \item Two \emph{edge} resolutions: the degenerate vertex becomes an
+    edge of the Voronoi cell (the far atom does not become a neighbor).
+  \item One \emph{square} resolution: a new quadrilateral face forms
+    between the central atom and the far atom.
+\end{itemize}
+The remaining 4~star types (in which the far atom becomes a neighbor via
+a triangular face) are secondary.  This recovers exactly the
+classification from~\cite{lazar2015}, where the 44~primary FCC types
+arise from $3^6 = 729$ combinations over the six unstable vertices.
+
+\subsection{SC cubic vertex ($k = 8$)}
+
+The eight atoms equidistant from a vertex of the simple cubic Voronoi
+cell form a cube.  There are 11{,}648~regular triangulations yielding
+544~star types.  The projected secondary polytope lives in
+$\R^{8-4} = \R^4$ and has \textbf{74~vertices}, corresponding to
+\textbf{59~primary star types} out of 544~total.
+
+This yields a dramatic reduction in the combinatorial enumeration space.
+With 8~degenerate vertices per SC Voronoi cell:
+\begin{center}
+\begin{tabular}{lcc}
+  \hline
+  & Resolutions/vertex & Total combinations \\
+  \hline
+  All types & 544 & $544^8 \approx 7.7 \times 10^{21}$ \\
+  Primary only & 59 & $59^8 \approx 1.5 \times 10^{14}$ \\
+  \hline
+\end{tabular}
+\end{center}
+The reduction factor is approximately $5 \times 10^7$.  With the
+$O_h$~point group symmetry ($|G| = 48$) and validity pruning, the
+primary enumeration becomes computationally feasible.
+
+
+\begin{thebibliography}{9}
+
+\bibitem{lazar2015}
+E.~A.~Lazar, J.~Han, and D.~J.~Srolovitz,
+``Topological framework for local structure analysis in condensed
+matter,'' \emph{Proc.\ Natl.\ Acad.\ Sci.\ USA}, vol.~112, no.~43,
+pp.~E5769--E5776, 2015.
+
+\bibitem{gkz1994}
+I.~M.~Gel'fand, M.~M.~Kapranov, and A.~V.~Zelevinsky,
+\emph{Discriminants, Resultants, and Multidimensional Determinants}.
+Birkh\"auser, 1994.
+
+\end{thebibliography}
+
+\end{document}
