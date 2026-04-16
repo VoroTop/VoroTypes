@@ -73,6 +73,10 @@ def _classify_primary(points, star_to_tris, all_tris):
     A triangulation is primary if its projected GKZ vector is a vertex
     of the convex hull of all projected GKZ vectors in R^{k-4}.
     A star type is primary if any of its triangulations is primary.
+
+    Multiple triangulations can share the same GKZ vector, so we
+    deduplicate before computing the hull to avoid missing stars
+    whose triangulation index wasn't selected as the hull representative.
     """
     k = len(points)
     A = np.column_stack([np.ones(k), points])
@@ -90,7 +94,17 @@ def _classify_primary(points, star_to_tris, all_tris):
             for i in idx:
                 gkz[t_idx, i] += vol
 
-    projected = gkz - gkz @ Q @ Q.T
+    # Deduplicate GKZ vectors: group triangulations by their GKZ vector
+    gkz_to_group = defaultdict(list)
+    for t_idx in range(n_tris):
+        key = tuple(np.round(gkz[t_idx], 12))
+        gkz_to_group[key].append(t_idx)
+
+    unique_keys = list(gkz_to_group.keys())
+    n_unique = len(unique_keys)
+    unique_gkz = np.array([gkz[gkz_to_group[uk][0]] for uk in unique_keys])
+
+    projected = unique_gkz - unique_gkz @ Q @ Q.T
     mean = projected.mean(axis=0)
     centered = projected - mean
     U, S, Vt = np.linalg.svd(centered, full_matrices=False)
@@ -106,7 +120,7 @@ def _classify_primary(points, star_to_tris, all_tris):
         vals = coords[:, 0]
         vmin, vmax = vals.min(), vals.max()
         if abs(vmax - vmin) < 1e-12:
-            hull_idx = set(range(n_tris))
+            hull_idx = set(range(n_unique))
         else:
             hull_idx = set(np.where(np.abs(vals - vmin) < 1e-12)[0])
             hull_idx |= set(np.where(np.abs(vals - vmax) < 1e-12)[0])
@@ -114,6 +128,7 @@ def _classify_primary(points, star_to_tris, all_tris):
         hull = ConvexHull(coords)
         hull_idx = set(hull.vertices)
 
+    # Map hull vertices back through ALL triangulations at each GKZ vector
     tri_to_star = {}
     for star, tri_keys in star_to_tris.items():
         for tk in tri_keys:
@@ -121,9 +136,10 @@ def _classify_primary(points, star_to_tris, all_tris):
 
     primary_stars = set()
     for idx in hull_idx:
-        tri_key = tri_list[idx]
-        if tri_key in tri_to_star:
-            primary_stars.add(tri_to_star[tri_key])
+        for t_idx in gkz_to_group[unique_keys[idx]]:
+            tri_key = tri_list[t_idx]
+            if tri_key in tri_to_star:
+                primary_stars.add(tri_to_star[tri_key])
 
     return primary_stars
 
