@@ -109,10 +109,10 @@ which is a full-dimensional cone in~$\R^k$.
 
 After projecting to the quotient $\R^{k-4} \cong \R^k / \text{Aff}(A)$,
 we obtain the \emph{projected secondary polytope}
-$\bar\Sigma(A) \subset \R^{k-4}$.  Not every vertex of $\Sigma(A)$ need
-project to a vertex of $\bar\Sigma(A)$: some may project to interior
-points if their GKZ vectors differ from another vertex's by an affine
-function of the point coordinates.
+$\bar\Sigma(A) \subset \R^{k-4}$.  Since the affine span of $\Sigma(A)$
+is a translate of $\text{Aff}(A)^\perp$, this projection is a
+combinatorial isomorphism: every vertex of $\Sigma(A)$ maps to a vertex
+of~$\bar\Sigma(A)$.
 
 
 \section{Classification Criterion}
@@ -120,31 +120,81 @@ function of the point coordinates.
 We now state the classification criterion.
 
 \begin{definition}
-A regular triangulation $T$ of $A$ is called \emph{primary} if its
-projected GKZ vector $\bar\varphi(T)$ is a vertex of the projected
-secondary polytope $\bar\Sigma(A) \subset \R^{k-4}$.  Otherwise, $T$ is
-\emph{secondary}.  A star type (resolution) $S$ is primary if at least
-one regular triangulation producing star $S$ is primary.
+A triangulation of~$A$ is \emph{proper} if every maximal simplex has
+positive volume.  A star type (resolution)~$S$ is \emph{primary} if at
+least one proper regular triangulation of~$A$ produces star~$S$;
+otherwise $S$ is \emph{secondary}.
 \end{definition}
 
 \begin{proposition}
-A primary triangulation has a full-dimensional normal cone in
-$\R^{k-4}$, meaning it is induced by an open set of effective height
-functions.  Consequently, it arises under a positive-measure set of
-perturbation directions as $\varepsilon \to 0$.  A secondary
-triangulation's projected GKZ vector lies in the interior of
-$\bar\Sigma(A)$ and is not induced by any open set of effective height
-functions; it can only arise on a measure-zero set of perturbation
-directions.
+The GKZ secondary polytope $\Sigma(A)$ has one vertex for each regular
+triangulation of~$A$.  The affine span of $\Sigma(A)$ is a translate of
+$\operatorname{Aff}(A)^\perp$, so the projection
+$\Sigma(A) \to \bar\Sigma(A) \subset \R^{k-4}$ is a combinatorial
+isomorphism: every vertex of $\Sigma(A)$ maps to a vertex of
+$\bar\Sigma(A)$.  Consequently, every proper regular triangulation has a
+full-dimensional normal cone in the effective height space $\R^{k-4}$,
+meaning it is induced by an open set of effective height functions and
+arises under a positive-measure set of perturbation directions as
+$\varepsilon \to 0$.
 \end{proposition}
 
-At the level of a single degenerate vertex, primary star types are those
-whose corresponding perturbation regions have positive solid angle in the
-effective height space, while secondary star types occupy
-lower-dimensional boundaries.
+Primary star types therefore have positive solid angle in the effective
+height space.  A global Voronoi cell type is primary if the resolution
+at every degenerate vertex is a primary star type.
 
-A global Voronoi cell type is primary if the resolution at every
-degenerate vertex is a primary star type.
+\subsection{Degenerate triangulations and secondary types}
+
+The flip-graph enumeration of regular triangulations can produce
+configurations that include \emph{zero-volume simplices}: tetrahedra
+whose four vertices are co-planar.  These arise when a lower-dimensional
+face of the convex hull $\conv(A)$ admits more than one triangulation,
+and the enumeration explores subdivisions of such faces.  We call a
+triangulation containing any zero-volume simplex \emph{degenerate}.
+
+For the octahedral configuration ($k = 6$), the flip-graph enumeration
+produces 9~triangulations, of which only 3~are proper.  For the cubic
+configuration ($k = 8$), the enumeration produces
+11{,}648~triangulations, of which only 74~are proper.
+
+Degenerate triangulations are problematic for the primary classification
+in two ways:
+\begin{enumerate}
+\item \textbf{GKZ vector inflation.}  A zero-volume simplex contributes
+  nothing to the GKZ vector~\eqref{eq:gkz}, so many degenerate
+  triangulations share their GKZ vector with a proper triangulation that
+  differs only in the subdivision of co-planar faces.  For the cube,
+  11{,}648~triangulations produce only 152~distinct GKZ vectors, while
+  the 74~proper triangulations have 74~distinct vectors.
+\item \textbf{Phantom star types.}  A zero-volume simplex that contains
+  the central atom~$p_1$ changes the star without changing the GKZ
+  vector.  This creates star types that are not realizable by any proper
+  triangulation---they require co-planar atoms to remain exactly
+  co-planar under perturbation, a measure-zero condition.  For the cube,
+  the 544~total star types include 512~phantom types that are only
+  realized by degenerate triangulations.
+\end{enumerate}
+
+The resolution is to filter to proper triangulations before performing
+the GKZ analysis.  By the GKZ bijection theorem, proper regular
+triangulations have unique GKZ vectors, and the projected secondary
+polytope faithfully represents their combinatorial structure.
+
+\begin{paragraph}{Regularity of proper triangulations.}
+The algorithm enumerates regular triangulations via flip-graph BFS,
+which is complete over the regular triangulation graph by the GKZ
+connectivity theorem.  A natural question is whether there exist proper
+triangulations that are \emph{not} regular and hence missed by this
+enumeration.  For $k \leq d + 3 = 6$ points in $\R^3$, all
+triangulations are regular~\cite{dlrs2010}.  For the cube ($k = 8$), we
+verify computationally that all 74~proper triangulations appear in the
+flip-graph enumeration.  In general, non-regular triangulations of
+convex point sets exist for sufficiently large~$k$, but this does not
+affect correctness: only regular triangulations can arise from
+height-function perturbations, so any non-regular proper triangulation
+(if one existed) would not be physically realizable and is correctly
+excluded.
+\end{paragraph}
 
 
 \section{Computational Procedure}
@@ -154,26 +204,36 @@ with $k$ equidistant atoms $A = \{p_1, \ldots, p_k\}$:
 
 \begin{enumerate}
 \item \textbf{Enumerate regular triangulations.}
-  Use a flip-graph BFS or exact backtracking search to find all regular
-  triangulations $T_1, \ldots, T_N$ of~$A$.
+  Use a flip-graph BFS to find all regular triangulations of~$A$.
+  This enumeration is complete by the GKZ connectivity theorem.
+
+\item \textbf{Filter to proper triangulations.}
+  Discard any triangulation containing a zero-volume simplex (four
+  co-planar vertices).  These degenerate triangulations arise from
+  subdivisions of lower-dimensional faces and represent measure-zero
+  perturbation conditions.  Let $T_1, \ldots, T_M$ denote the
+  remaining proper triangulations.
 
 \item \textbf{Compute GKZ vectors.}
-  For each triangulation $T_j$, compute $\varphi(T_j) \in \R^k$ using
-  equation~\eqref{eq:gkz}.
+  For each proper triangulation $T_j$, compute $\varphi(T_j) \in \R^k$
+  using equation~\eqref{eq:gkz}.  By the GKZ bijection theorem, these
+  $M$~vectors are distinct.
 
 \item \textbf{Project to $\R^{k-4}$.}
   Let $V \subset \R^k$ be the affine span of $A$ augmented by the
-  constant vector (dimension~4).  Project each $\varphi(T_j)$ onto
-  $V^\perp$ to obtain $\bar\varphi(T_j) \in \R^{k-4}$.
+  constant vector (dimension~4).  Project each GKZ vector onto
+  $V^\perp$ to obtain points in $\R^{k-4}$.
 
-\item \textbf{Compute convex hull.}
-  Find the convex hull of $\{\bar\varphi(T_j)\}_{j=1}^N$ in
-  $\R^{k-4}$.  The vertices of this hull identify the primary
-  triangulations.
+\item \textbf{Identify hull vertices.}
+  Compute the convex hull of the $M$ projected points.  For all
+  configurations tested, every proper triangulation projects to a vertex
+  of this hull (consistent with the combinatorial isomorphism between
+  $\Sigma(A)$ and $\bar\Sigma(A)$).
 
-\item \textbf{Map to star types.}
-  A star type is primary if any of its associated triangulations is a
-  hull vertex.
+\item \textbf{Extract primary star types.}
+  For each hull vertex, extract the star of the central atom from the
+  corresponding triangulation.  The union of these stars gives the set
+  of primary star types.
 \end{enumerate}
 
 
@@ -182,32 +242,36 @@ with $k$ equidistant atoms $A = \{p_1, \ldots, p_k\}$:
 \subsection{FCC octahedral vertex ($k = 6$)}
 
 The six atoms equidistant from an octahedral vertex in FCC form a
-regular octahedron.  There are 9~regular triangulations yielding 7~star
-types.  The projected secondary polytope lives in $\R^{6-4} = \R^2$ and
-has \textbf{3~vertices}.  The corresponding 3~primary star types are:
+regular octahedron.  The flip-graph enumeration produces 9~triangulations,
+of which 3~are proper (the remaining 6~contain zero-volume tetrahedra
+from co-planar atom triples).  The 3~proper triangulations yield 3~distinct
+star types, all of which are primary:
 \begin{itemize}
   \item Two \emph{edge} resolutions: the degenerate vertex becomes an
     edge of the Voronoi cell (the far atom does not become a neighbor).
   \item One \emph{square} resolution: a new quadrilateral face forms
     between the central atom and the far atom.
 \end{itemize}
-The remaining 4~star types (in which the far atom becomes a neighbor via
-a triangular face) are secondary.  This recovers exactly the
-classification from~\cite{lazar2015}, where the 44~primary FCC types
-arise from $3^6 = 729$ combinations over the six unstable vertices.
+The 6~degenerate triangulations produce 4~additional star types (in
+which the far atom becomes a neighbor via a triangular face); these are
+secondary.  This recovers exactly the classification
+from~\cite{lazar2015}, where the 44~primary FCC types arise from
+$3^6 = 729$ combinations over the six unstable vertices.
 
 \subsection{SC cubic vertex ($k = 8$)}
 
 The eight atoms equidistant from a vertex of the simple cubic Voronoi
-cell form a cube.  There are 11{,}648~regular triangulations, but only
-152~distinct GKZ vectors and 544~star types.  The projected secondary
-polytope lives in $\R^{8-4} = \R^4$ and has \textbf{74~vertices}
-(out of 152 distinct GKZ points), corresponding to
-\textbf{256~primary star types} out of 544~total.  Note that multiple
-triangulations can share the same GKZ vector while having different
-stars; all stars associated with a vertex GKZ vector are primary.
+cell form a cube.  The flip-graph enumeration produces
+11{,}648~triangulations, of which only \textbf{74~are proper} (the
+remaining 11{,}574 contain zero-volume tetrahedra from co-planar atom
+quadruples on the cube faces).  The 74~proper triangulations have
+74~distinct GKZ vectors, all of which are vertices of the projected
+secondary polytope in $\R^{8-4} = \R^4$.  These 74~proper
+triangulations produce \textbf{32~distinct star types}, all primary.
+The total number of star types (including degenerate triangulations)
+is~544, so 512~are secondary.
 
-This yields a significant reduction in the combinatorial enumeration
+This yields a substantial reduction in the combinatorial enumeration
 space.  With 8~degenerate vertices per SC Voronoi cell:
 \begin{center}
 \begin{tabular}{lcc}
@@ -215,13 +279,13 @@ space.  With 8~degenerate vertices per SC Voronoi cell:
   & Resolutions/vertex & Total combinations \\
   \hline
   All types & 544 & $544^8 \approx 7.7 \times 10^{21}$ \\
-  Primary only & 256 & $256^8 \approx 1.8 \times 10^{19}$ \\
+  Primary only & 32 & $32^8 \approx 1.1 \times 10^{12}$ \\
   \hline
 \end{tabular}
 \end{center}
-The reduction factor is approximately $4 \times 10^2$.  While less
-dramatic than the FCC case, the $O_h$~point group symmetry ($|G| = 48$)
-and validity pruning provide further reduction.
+The reduction factor is approximately $10^{10}$, far more dramatic
+than the FCC case.  The $O_h$~point group symmetry ($|G| = 48$) and
+validity pruning provide further reduction.
 
 
 \begin{thebibliography}{9}
@@ -236,6 +300,11 @@ pp.~E5769--E5776, 2015.
 I.~M.~Gel'fand, M.~M.~Kapranov, and A.~V.~Zelevinsky,
 \emph{Discriminants, Resultants, and Multidimensional Determinants}.
 Birkh\"auser, 1994.
+
+\bibitem{dlrs2010}
+J.~A.~De~Loera, J.~Rambau, and F.~Santos,
+\emph{Triangulations: Structures for Algorithms and Applications}.
+Springer, 2010.
 
 \end{thebibliography}
 
