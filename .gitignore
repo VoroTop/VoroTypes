@@ -1,0 +1,25 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.DS_Store
+*.lmp
+*.dump
+*.data
+log.lammps
+
+# C++ build artifacts
+voronoi_core
+*.o
+
+# Binary data files
+*.bin
+
+# LaTeX build files
+*.aux
+*.log
+*.synctex.gz
