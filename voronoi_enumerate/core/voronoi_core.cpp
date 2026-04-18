@@ -16,6 +16,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <cmath>
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -49,6 +50,53 @@ struct ActiveElem {
     int gi;
     int resume;
 };
+
+// ===================================================================
+// HyperLogLog for memory-efficient distinct counting
+// ===================================================================
+
+static constexpr int HLL_P = 14;
+static constexpr int HLL_M = 1 << HLL_P;
+
+struct HyperLogLog {
+    uint8_t registers[HLL_M] = {};
+
+    void add(uint64_t hash) {
+        int j = hash & (HLL_M - 1);
+        uint64_t w = hash >> HLL_P;
+        int rho = w == 0 ? (64 - HLL_P + 1) : (__builtin_clzll(w) + 1);
+        if (rho > registers[j]) registers[j] = rho;
+    }
+
+    void merge(const HyperLogLog& other) {
+        for (int i = 0; i < HLL_M; i++)
+            if (other.registers[i] > registers[i])
+                registers[i] = other.registers[i];
+    }
+
+    double estimate() const {
+        double alpha = 0.7213 / (1.0 + 1.079 / HLL_M);
+        double sum = 0;
+        int zeros = 0;
+        for (int i = 0; i < HLL_M; i++) {
+            sum += 1.0 / (1ULL << registers[i]);
+            if (registers[i] == 0) zeros++;
+        }
+        double est = alpha * HLL_M * HLL_M / sum;
+        if (est <= 2.5 * HLL_M && zeros > 0)
+            est = HLL_M * log((double)HLL_M / zeros);
+        return est;
+    }
+};
+
+static uint64_t hash_wv(const int* data, int len) {
+    uint64_t h = 0xcbf29ce484222325ULL;
+    for (int i = 0; i < len; i++) {
+        h ^= (uint64_t)(uint32_t)data[i];
+        h *= 0x100000001b3ULL;
+    }
+    return h;
+}
 
 inline int dart_id(int u, int v) { return u * MAX_V + v; }
 inline int dart_u(int id) { return id / MAX_V; }
@@ -705,6 +753,8 @@ struct SubtreeResult {
     std::map<std::vector<int>, std::pair<int64_t, int64_t>> pvec_hist;
     // Weinberg vectors (optional, for small enumerations)
     std::map<std::vector<int>, int64_t> wv_counts;
+    // HyperLogLog sketch for distinct type counting
+    HyperLogLog hll;
 };
 
 static void process_dfs(
@@ -716,7 +766,7 @@ static void process_dfs(
         const int* res_perms_flat,
         int nv, int mnr, int sym_order,
         const EnumData& data,
-        bool compute_weinberg, bool count_only,
+        bool compute_weinberg, bool count_only, bool hash_count,
         SubtreeResult& result,
         std::atomic<int64_t>* global_classified) {
     if (depth == d) {
@@ -724,7 +774,8 @@ static void process_dfs(
         int orbit_size = sym_order / n_active_at[depth];
         if (count_only) return;
 
-        auto ct = classify_combo(combo, data, compute_weinberg);
+        bool need_weinberg = compute_weinberg || hash_count;
+        auto ct = classify_combo(combo, data, need_weinberg);
         if (global_classified) ++(*global_classified);
         if (ct.pv.empty()) return;
 
@@ -732,7 +783,12 @@ static void process_dfs(
         ph.first++;
         ph.second += orbit_size;
 
-        if (compute_weinberg) {
+        if (hash_count && !ct.wv.empty()) {
+            uint64_t h = hash_wv(ct.wv.data(), (int)ct.wv.size());
+            result.hll.add(h);
+        }
+
+        if (compute_weinberg && !hash_count) {
             result.wv_counts[ct.wv] += orbit_size;
         }
         return;
@@ -775,8 +831,8 @@ static void process_dfs(
             n_active_at[depth + 1] = new_n;
             process_dfs(depth + 1, d, combo, levels, n_active_at,
                         vperm_inv_flat, res_perms_flat, nv, mnr, sym_order,
-                        data, compute_weinberg, count_only, result,
-                        global_classified);
+                        data, compute_weinberg, count_only, hash_count,
+                        result, global_classified);
         }
     }
 }
@@ -784,6 +840,7 @@ static void process_dfs(
 static SubtreeResult process_subtree(
         const Subtree& st, const EnumData& data,
         bool compute_weinberg, bool count_only,
+        bool hash_count = false,
         std::atomic<int64_t>* global_classified = nullptr) {
     int d = data.n_vertices;
     int combo[MAX_DEPTH] = {};
@@ -801,8 +858,8 @@ static SubtreeResult process_subtree(
     process_dfs(start, d, combo, levels, n_active_at,
                 data.vperm_inv_flat.data(), data.res_perms_flat.data(),
                 data.n_vertices, data.max_n_res, data.sym_order,
-                data, compute_weinberg, count_only, result,
-                global_classified);
+                data, compute_weinberg, count_only, hash_count,
+                result, global_classified);
     return result;
 }
 
@@ -812,8 +869,8 @@ static SubtreeResult process_subtree(
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s input.bin [-j N] [--count-only] [--no-weinberg]\n",
-                argv[0]);
+        fprintf(stderr, "Usage: %s input.bin [-j N] [--count-only] "
+                "[--no-weinberg] [--hash-count]\n", argv[0]);
         return 1;
     }
 
@@ -821,6 +878,7 @@ int main(int argc, char** argv) {
     int n_workers = 1;
     bool count_only = false;
     bool compute_weinberg = true;
+    bool hash_count = false;
 
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "-j") == 0 && i+1 < argc)
@@ -829,6 +887,10 @@ int main(int argc, char** argv) {
             count_only = true;
         else if (strcmp(argv[i], "--no-weinberg") == 0)
             compute_weinberg = false;
+        else if (strcmp(argv[i], "--hash-count") == 0) {
+            hash_count = true;
+            compute_weinberg = false;
+        }
     }
 
     // Load data
@@ -846,6 +908,7 @@ int main(int argc, char** argv) {
     printf("\nTotal combinations: %lld\n", (long long)total);
     printf("Workers: %d\n", n_workers);
     if (count_only) printf("Mode: count-only\n");
+    else if (hash_count) printf("Mode: hash-count (Weinberg + HyperLogLog)\n");
     else if (!compute_weinberg) printf("Mode: p-vector histogram\n");
     else printf("Mode: full Weinberg enumeration\n");
 
@@ -918,6 +981,7 @@ int main(int argc, char** argv) {
     for (int64_t si = 0; si < total_subtrees; si++) {
         results[si] = process_subtree(subtrees[si], data,
                                        compute_weinberg, count_only,
+                                       hash_count,
                                        count_only ? nullptr : &classified);
         ++progress;
     }
@@ -930,12 +994,16 @@ int main(int argc, char** argv) {
     int64_t n_canonical = 0;
     std::map<std::vector<int>, std::pair<int64_t, int64_t>> pvec_hist;
     std::map<std::vector<int>, int64_t> wv_counts;
+    HyperLogLog merged_hll;
 
     for (auto& r : results) {
         n_canonical += r.n_canonical;
         for (auto& [pv, stats] : r.pvec_hist) {
             pvec_hist[pv].first += stats.first;
             pvec_hist[pv].second += stats.second;
+        }
+        if (hash_count) {
+            merged_hll.merge(r.hll);
         }
         if (compute_weinberg) {
             for (auto& [wv, cnt] : r.wv_counts)
@@ -957,7 +1025,17 @@ int main(int argc, char** argv) {
             for (auto& [pv, s] : pvec_hist)
                 n_types += s.first;
         }
-        printf("Distinct cell types: %lld\n", (long long)n_types);
+
+        if (hash_count) {
+            double hll_est = merged_hll.estimate();
+            printf("Distinct cell types (HyperLogLog estimate): %.0f\n",
+                   hll_est);
+            printf("  (±%.1f%% relative error)\n", 1.04 / sqrt(HLL_M) * 100);
+            printf("Canonical combinations per distinct type: %.3f\n",
+                   n_canonical / hll_est);
+        } else {
+            printf("Distinct cell types: %lld\n", (long long)n_types);
+        }
 
         printf("\np-vector histogram:\n");
         printf("%-50s  %10s  %15s\n", "p-vector", "# types", "total count");
