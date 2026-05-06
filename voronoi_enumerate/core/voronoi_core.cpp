@@ -869,8 +869,8 @@ static SubtreeResult process_subtree(
 
 int main(int argc, char** argv) {
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s input.bin [-j N] [--count-only] "
-                "[--no-weinberg] [--hash-count]\n", argv[0]);
+        fprintf(stderr, "Usage: %s input.bin [-j N] [-o PATH] [-n NAME] "
+                "[--count-only] [--no-weinberg] [--hash-count]\n", argv[0]);
         return 1;
     }
 
@@ -879,10 +879,16 @@ int main(int argc, char** argv) {
     bool count_only = false;
     bool compute_weinberg = true;
     bool hash_count = false;
+    const char* out_path = nullptr;
+    const char* name = nullptr;
 
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "-j") == 0 && i+1 < argc)
             n_workers = atoi(argv[++i]);
+        else if (strcmp(argv[i], "-o") == 0 && i+1 < argc)
+            out_path = argv[++i];
+        else if (strcmp(argv[i], "-n") == 0 && i+1 < argc)
+            name = argv[++i];
         else if (strcmp(argv[i], "--count-only") == 0)
             count_only = true;
         else if (strcmp(argv[i], "--no-weinberg") == 0)
@@ -1053,31 +1059,47 @@ int main(int argc, char** argv) {
 
     printf("\nTotal time: %.1f seconds\n", total_time);
 
-    // Write Weinberg vectors to binary file if computed
+    // Write VoroTop-compatible .filter file (matches Python output format)
     if (compute_weinberg && !wv_counts.empty()) {
-        std::string out_path = std::string(input_path);
-        auto dot = out_path.rfind('.');
-        if (dot != std::string::npos)
-            out_path = out_path.substr(0, dot);
-        out_path += "_results.bin";
+        // Derive default name and output path from the input filename if
+        // the user did not supply -n / -o.
+        std::string base = input_path;
+        auto slash = base.find_last_of('/');
+        if (slash != std::string::npos) base = base.substr(slash + 1);
+        auto dot = base.rfind('.');
+        if (dot != std::string::npos) base = base.substr(0, dot);
 
-        FILE* out = fopen(out_path.c_str(), "wb");
+        std::string filter_name = name ? std::string(name) : base;
+        std::string filter_path =
+            out_path ? std::string(out_path) : (base + ".filter");
+
+        FILE* out = fopen(filter_path.c_str(), "w");
         if (out) {
-            int32_t n_wv = (int32_t)wv_counts.size();
-            fwrite("VRES", 1, 4, out);
-            fwrite(&n_wv, 4, 1, out);
-            for (auto& [wv, cnt] : wv_counts) {
-                int32_t wv_len = (int32_t)wv.size();
-                int32_t count = (int32_t)cnt;
-                fwrite(&wv_len, 4, 1, out);
-                for (int v : wv) {
-                    int32_t iv = v;
-                    fwrite(&iv, 4, 1, out);
+            fprintf(out, "#\t%s filter, computed by voronoi_enumerate\n",
+                    filter_name.c_str());
+            fprintf(out, "#\tTotal Weinberg types: %lld\n",
+                    (long long)wv_counts.size());
+            // Single group; the binary input represents one site.
+            fprintf(out, "*\t1\t%s\tatoms [0]\n", filter_name.c_str());
+            // wv_counts is std::map → keys are already lex-sorted, matching
+            // Python's `sorted(ct.keys())`.
+            for (auto& [wv, _cnt] : wv_counts) {
+                fputs("1\t(", out);
+                for (size_t i = 0; i < wv.size(); i++) {
+                    if (i) fputc(',', out);
+                    fprintf(out, "%d", wv[i]);
                 }
-                fwrite(&count, 4, 1, out);
+                fputs(")\n", out);
             }
             fclose(out);
-            printf("Weinberg vectors written to: %s\n", out_path.c_str());
+            printf("Filter file written: %s (%lld type(s), "
+                   "%lld Weinberg vectors)\n",
+                   filter_path.c_str(), 1LL,
+                   (long long)wv_counts.size());
+        } else {
+            fprintf(stderr, "Failed to open %s for writing\n",
+                    filter_path.c_str());
+            return 1;
         }
     }
 
