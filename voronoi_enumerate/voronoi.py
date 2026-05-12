@@ -309,12 +309,20 @@ def _cluster_centers(centers, radii, tol):
 
     # Find the gap: the first large jump in sorted pairwise distances.
     # Pairs before the gap are "coincident"; pairs after are "distinct".
+    # We require that the "coincident" pairs sit at near-floating-point
+    # precision (< MAX_COINCIDENT_DIST).  Without this guard, structures
+    # with many symmetry-equivalent vertex spacings (e.g., MgCu2) produce
+    # spurious clustering: the spread among equal distances is zero, so
+    # any nonzero gap to the next bucket spuriously triggers a cutoff.
+    MAX_COINCIDENT_DIST = 1e-3
     cluster_tol = tol  # default to absolute tolerance
     for k in range(len(sorted_combined) - 1):
         gap = sorted_combined[k + 1] - sorted_combined[k]
         spread = sorted_combined[k] - sorted_combined[0] if k > 0 else 0
         noise = max(spread, tol)
-        if gap > 100 * noise and sorted_combined[k + 1] > tol:
+        if (gap > 100 * noise
+                and sorted_combined[k + 1] > tol
+                and sorted_combined[k] < MAX_COINCIDENT_DIST):
             # The threshold is the midpoint of the gap
             cluster_tol = (sorted_combined[k] + sorted_combined[k + 1]) / 2
             break
