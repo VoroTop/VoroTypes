@@ -10,6 +10,7 @@ Usage:
     python enumerate_cells.py structure.cif --max-memory 8
 """
 
+import os
 import sys
 import time
 import resource
@@ -23,6 +24,34 @@ from voronoi_enumerate.combine import (
     summarize_cell_types, classify_neighbors,
 )
 from voronoi_enumerate.filter import write_filter_file
+
+
+SUMMARY_COLUMNS = [
+    'name', 'mode', 'status', 'runtime_sec',
+    'n_atoms_basis', 'n_sites_enumerated',
+    'n_wv_total', 'max_family',
+    'min_gap_delta', 'n_images', 'near_gap_threshold',
+    'symmetrized', 'notes',
+]
+
+
+def _vertex_min_gap_rel(v, coords):
+    """Smallest relative gap (d_next - r) / r across non-equidistant atoms."""
+    dists = np.linalg.norm(coords - v.position, axis=1)
+    eq = set(v.atom_indices)
+    non_eq = [d for i, d in enumerate(dists) if i not in eq]
+    if not non_eq:
+        return float('inf')
+    return (min(non_eq) - v.circumradius) / v.circumradius
+
+
+def _append_summary_row(path, row):
+    """Append a row to the summary TSV, creating header if file is new."""
+    new_file = not os.path.exists(path) or os.path.getsize(path) == 0
+    with open(path, 'a') as f:
+        if new_file:
+            f.write('\t'.join(SUMMARY_COLUMNS) + '\n')
+        f.write('\t'.join(str(row.get(c, '')) for c in SUMMARY_COLUMNS) + '\n')
 
 
 def _a15(a=1.0):
@@ -106,7 +135,8 @@ CRYSTALS = {
 
 
 def run(name, atom_indices=None, legacy=False, all_types=False,
-        n_workers=1, near_gap_threshold=None, primary_only=False):
+        n_workers=1, near_gap_threshold=None, primary_only=False,
+        n_images=3, summary_out=None, symmetrized=False, notes=''):
     t0 = time.time()
 
     cryst = CRYSTALS[name]()
@@ -114,9 +144,14 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
     print(f"Atoms per unit cell: {cryst.n_atoms}")
     print(f"Species: {cryst.species}")
     print(f"Lattice:\n{cryst.lattice}\n")
+    print(f"Supercell images: +/-{n_images} in each direction")
 
     if atom_indices is None:
         atom_indices = list(range(cryst.n_atoms))
+
+    # Track the smallest relative gap across every vertex of every atom;
+    # this is the limiting near-equidistant scale for the filter.
+    min_gap_delta = float('inf')
 
     # Collect cell types from all atoms for filter file output
     # Each entry is (atom_index, cell_types_dict)
@@ -128,8 +163,14 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
         print("=" * 65)
         vertices, central_idx, coords, images = analyze_voronoi(
             cryst, atom_index=atom_idx,
+            n_images=n_images,
             near_gap_threshold=near_gap_threshold,
         )
+
+        for v in vertices:
+            gap = _vertex_min_gap_rel(v, coords)
+            if gap < min_gap_delta:
+                min_gap_delta = gap
 
         degen = [v for v in vertices if v.is_degenerate]
         generic = [v for v in vertices if not v.is_degenerate]
@@ -240,6 +281,39 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
     elapsed = time.time() - t0
     print(f"\nTotal time: {elapsed:.1f} seconds")
 
+    if summary_out is not None:
+        if primary_only:
+            mode = 'primary'
+        elif all_types:
+            mode = 'all'
+        else:
+            mode = 'default'
+        # Largest cell-type family across all enumerated sites
+        max_family = 0
+        for _, cts in per_atom_types:
+            if cts and len(cts) > max_family:
+                max_family = len(cts)
+        row = {
+            'name': name,
+            'mode': mode,
+            'status': 'OK',
+            'runtime_sec': f'{elapsed:.2f}',
+            'n_atoms_basis': cryst.n_atoms,
+            'n_sites_enumerated': len(atom_indices),
+            'n_wv_total': n_wv,
+            'max_family': max_family,
+            'min_gap_delta': (f'{min_gap_delta:.6e}'
+                              if min_gap_delta != float('inf') else 'inf'),
+            'n_images': n_images,
+            'near_gap_threshold': (near_gap_threshold
+                                    if near_gap_threshold is not None
+                                    else ''),
+            'symmetrized': 'Y' if symmetrized else 'N',
+            'notes': notes,
+        }
+        _append_summary_row(summary_out, row)
+        print(f"Summary row appended to {summary_out}")
+
 
 if __name__ == '__main__':
     import os
@@ -273,6 +347,25 @@ if __name__ == '__main__':
         if idx + 1 < len(sys.argv):
             near_gap_threshold = float(sys.argv[idx + 1])
 
+    n_images = 3
+    if '--n-images' in sys.argv:
+        idx = sys.argv.index('--n-images')
+        if idx + 1 < len(sys.argv):
+            n_images = int(sys.argv[idx + 1])
+
+    summary_out = None
+    if '--summary-out' in sys.argv:
+        idx = sys.argv.index('--summary-out')
+        if idx + 1 < len(sys.argv):
+            summary_out = sys.argv[idx + 1]
+
+    symmetrize = '--symmetrize' in sys.argv
+    symprec = 0.01
+    if '--symprec' in sys.argv:
+        idx = sys.argv.index('--symprec')
+        if idx + 1 < len(sys.argv):
+            symprec = float(sys.argv[idx + 1])
+
     max_memory = MAX_MEMORY_GB
     if '--max-memory' in sys.argv:
         idx = sys.argv.index('--max-memory')
@@ -281,19 +374,29 @@ if __name__ == '__main__':
     set_memory_limit(max_memory)
 
     if name in CRYSTALS:
+        if symmetrize:
+            cryst = CRYSTALS[name]().symmetrized(symprec=symprec)
+            CRYSTALS[name] = lambda c=cryst: c
         run(name, atom_indices=atom_indices, legacy=legacy,
             all_types=all_types, n_workers=n_workers,
             near_gap_threshold=near_gap_threshold,
-            primary_only=primary_only)
+            primary_only=primary_only, n_images=n_images,
+            summary_out=summary_out, symmetrized=symmetrize)
     elif os.path.isfile(name):
         # Load crystal structure from CIF, POSCAR, or other file
         cryst = Crystal.from_file(name)
+        n_before = cryst.n_atoms
+        if symmetrize:
+            cryst = cryst.symmetrized(symprec=symprec)
+            print(f"Symmetrized at symprec={symprec}: "
+                  f"{n_before} -> {cryst.n_atoms} atoms")
         label = os.path.splitext(os.path.basename(name))[0]
         CRYSTALS[label] = lambda c=cryst: c
         run(label, atom_indices=atom_indices, legacy=legacy,
             all_types=all_types, n_workers=n_workers,
             near_gap_threshold=near_gap_threshold,
-            primary_only=primary_only)
+            primary_only=primary_only, n_images=n_images,
+            summary_out=summary_out, symmetrized=symmetrize)
     else:
         print(f"Unknown crystal: {name}")
         print(f"Built-in structures: {', '.join(CRYSTALS)}")

@@ -281,6 +281,63 @@ class Crystal:
         """Cartesian coordinates of unit cell atoms."""
         return self.frac_coords @ self.lattice
 
+    def symmetrized(self, symprec=0.01):
+        """Return a copy with coordinates snapped to the detected space group.
+
+        Uses ``spglib.standardize_cell`` with ``to_primitive=False`` and
+        ``no_idealize=False`` to keep the cell choice while snapping the
+        fractional coordinates onto symmetry-exact positions for the
+        detected space group.  This removes the DFT-relaxation noise that
+        typically appears in Materials Project CIFs, where atoms on
+        equivalent Wyckoff sites are listed with slightly different
+        coordinates.
+
+        Parameters
+        ----------
+        symprec : float
+            Tolerance for space group detection.  Default 0.01 (in
+            fractional units) works for MP CIFs; larger values
+            (0.05--0.1) may be needed for very noisy inputs.
+
+        Returns
+        -------
+        Crystal
+            A new Crystal with idealized coordinates.
+
+        Raises
+        ------
+        RuntimeError
+            If spglib cannot detect any space group at the given
+            tolerance.
+        """
+        import spglib
+
+        # Map species labels to integer "atomic numbers" for spglib.
+        sp_to_num = {}
+        next_id = 200
+        numbers = []
+        for sp in self.species:
+            if sp not in sp_to_num:
+                try:
+                    from pymatgen.core.periodic_table import Element
+                    sp_to_num[sp] = int(Element(sp).Z)
+                except Exception:
+                    sp_to_num[sp] = next_id
+                    next_id += 1
+            numbers.append(sp_to_num[sp])
+
+        cell = (self.lattice, self.frac_coords, numbers)
+        refined = spglib.standardize_cell(
+            cell, to_primitive=False, no_idealize=False, symprec=symprec)
+        if refined is None:
+            raise RuntimeError(
+                f"spglib could not detect a space group at "
+                f"symprec={symprec}")
+        new_lattice, new_frac, new_nums = refined
+        num_to_sp = {n: sp for sp, n in sp_to_num.items()}
+        new_species = [num_to_sp[int(n)] for n in new_nums]
+        return Crystal(new_lattice, new_frac, new_species)
+
     def make_supercell(self, n_images=3):
         """Generate supercell with periodic images in all directions.
 
