@@ -36,13 +36,23 @@ SUMMARY_COLUMNS = [
 
 
 def _vertex_min_gap_rel(v, coords):
-    """Smallest relative gap (d_next - r) / r across non-equidistant atoms."""
+    """Perturbation safety margin (d_next - r) / (2r).
+
+    Returns the largest relative perturbation sigma/r for which no
+    non-equidistant atom can cross the perpendicular bisector and join
+    the equidistant set at this vertex.  An atom at distance d > r
+    crosses when both it and the central atom move by sigma toward each
+    other, i.e. sigma = (d - r) / 2, so sigma/r = (d - r) / (2 r).
+
+    This is the convention used in the paper for delta_min (e.g. the
+    MgCu2 0.247 and omega-Ti 0.34 figures in Sections 5.2 and 5.3).
+    """
     dists = np.linalg.norm(coords - v.position, axis=1)
     eq = set(v.atom_indices)
     non_eq = [d for i, d in enumerate(dists) if i not in eq]
     if not non_eq:
         return float('inf')
-    return (min(non_eq) - v.circumradius) / v.circumradius
+    return (min(non_eq) - v.circumradius) / (2.0 * v.circumradius)
 
 
 def _append_summary_row(path, row):
