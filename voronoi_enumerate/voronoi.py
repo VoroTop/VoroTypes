@@ -20,17 +20,39 @@ from .crystal import Crystal, AtomImage
 
 @dataclass
 class VoronoiVertex:
-    """A vertex of a Voronoi cell, possibly degenerate."""
+    """A vertex of a Voronoi cell, possibly degenerate.
+
+    For the subset-enumeration algorithm, atoms participating at this
+    vertex are split into two groups:
+    * ``core_atom_indices`` — atoms identified as truly equidistant by
+      adaptive gap detection (always 4 or more); these always
+      participate at the vertex under any small perturbation.
+    * ``borderline_atom_indices`` — atoms within
+      ``near_gap_threshold * circumradius`` of the core distance but
+      not part of the core (i.e. captured only by the threshold
+      extension).  Each borderline atom may or may not actually
+      participate at the vertex under a given perturbation;
+      downstream enumeration must consider all 2^|borderline| subsets.
+
+    ``atom_indices = core + borderline`` is kept for backward
+    compatibility with code that consumed the original behavior.
+    """
     position: np.ndarray
     circumradius: float
-    atom_indices: List[int]       # indices in the supercell arrays
+    atom_indices: List[int]       # core + borderline (full equidistant set)
     atom_ids: List[AtomImage]     # crystal-level identities
     n_equidistant: int
     delaunay_tets: List[Tuple[int, ...]] = field(default_factory=list)
+    core_atom_indices: List[int] = field(default_factory=list)
+    borderline_atom_indices: List[int] = field(default_factory=list)
 
     @property
     def is_degenerate(self):
         return self.n_equidistant > 4
+
+    @property
+    def has_borderline(self):
+        return bool(self.borderline_atom_indices)
 
     def point_config(self, coords, central_supercell_idx):
         """Extract the point configuration for resolution enumeration.
@@ -171,8 +193,9 @@ def analyze_voronoi(crystal, atom_index=0, n_images=3, tol=1e-8,
 
         # Find ALL equidistant atoms using gap-based detection
         dists = np.linalg.norm(coords - pos, axis=1)
-        equidistant = _find_equidistant(dists, rad, tol,
-                                         near_gap_threshold=near_gap_threshold)
+        core, borderline = _find_equidistant(
+            dists, rad, tol, near_gap_threshold=near_gap_threshold)
+        equidistant = sorted(core + borderline)
 
         # Collect original Delaunay tets at this vertex (in star of central)
         tets = [tuple(sorted(int(v) for v in cc_list[i][2])) for i in group]
@@ -184,6 +207,8 @@ def analyze_voronoi(crystal, atom_index=0, n_images=3, tol=1e-8,
             atom_ids=[images[i] for i in equidistant],
             n_equidistant=len(equidistant),
             delaunay_tets=tets,
+            core_atom_indices=core,
+            borderline_atom_indices=borderline,
         ))
 
     return vertices, central_idx, coords, images
@@ -216,8 +241,16 @@ def _find_equidistant(dists, radius, tol, near_gap_threshold=None):
 
     Returns
     -------
-    equidistant : list of int
-        Sorted indices of equidistant atoms.
+    core : list of int
+        Atoms identified as truly equidistant (passed the adaptive
+        gap detection).  Always >= 4 atoms.
+    borderline : list of int
+        Atoms added by the near_gap_threshold extension only —
+        within threshold of the core but not selected by adaptive
+        detection.  May be empty.  Under perturbation, each
+        borderline atom may or may not actually participate at the
+        vertex; downstream enumeration is responsible for
+        enumerating all 2^|borderline| subset configurations.
     """
     # Start with atoms that are definitely close to the circumradius.
     # Use a generous initial window to collect candidates.
@@ -254,6 +287,7 @@ def _find_equidistant(dists, radius, tol, near_gap_threshold=None):
         cutoff_idx = int(np.searchsorted(sorted_res, tol * 10))
         cutoff_idx = max(cutoff_idx, n_min)
 
+    core_cutoff = cutoff_idx
     # Extend to include near-equidistant atoms if threshold is set.
     # Check the gap between consecutive atoms in sorted-distance order:
     # if the next atom is very close to the last included atom (relative
@@ -268,7 +302,9 @@ def _find_equidistant(dists, radius, tol, near_gap_threshold=None):
             else:
                 break
 
-    return sorted(int(i) for i in order[:cutoff_idx])
+    core = sorted(int(i) for i in order[:core_cutoff])
+    borderline = sorted(int(i) for i in order[core_cutoff:cutoff_idx])
+    return core, borderline
 
 
 def _cluster_centers(centers, radii, tol):

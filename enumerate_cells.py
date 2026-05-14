@@ -146,7 +146,8 @@ CRYSTALS = {
 
 def run(name, atom_indices=None, legacy=False, all_types=False,
         n_workers=1, near_gap_threshold=None, primary_only=False,
-        n_images=3, summary_out=None, symmetrized=False, notes=''):
+        n_images=3, summary_out=None, symmetrized=False, notes='',
+        filter_dir='.'):
     t0 = time.time()
 
     cryst = CRYSTALS[name]()
@@ -281,7 +282,9 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
         per_atom_types.append((atom_idx, cell_types))
 
     # Write VoroTop filter file
-    filter_path = f"{name}.filter"
+    if filter_dir and filter_dir != '.':
+        os.makedirs(filter_dir, exist_ok=True)
+    filter_path = os.path.join(filter_dir, f"{name}.filter")
     n_wv, n_groups = write_filter_file(
         filter_path, name, per_atom_types, species=cryst.species
     )
@@ -383,6 +386,12 @@ if __name__ == '__main__':
             max_memory = float(sys.argv[idx + 1])
     set_memory_limit(max_memory)
 
+    filter_dir = '.'
+    if '--filter-dir' in sys.argv:
+        idx = sys.argv.index('--filter-dir')
+        if idx + 1 < len(sys.argv):
+            filter_dir = sys.argv[idx + 1]
+
     if name in CRYSTALS:
         if symmetrize:
             cryst = CRYSTALS[name]().symmetrized(symprec=symprec)
@@ -391,7 +400,8 @@ if __name__ == '__main__':
             all_types=all_types, n_workers=n_workers,
             near_gap_threshold=near_gap_threshold,
             primary_only=primary_only, n_images=n_images,
-            summary_out=summary_out, symmetrized=symmetrize)
+            summary_out=summary_out, symmetrized=symmetrize,
+            filter_dir=filter_dir)
     elif os.path.isfile(name):
         # Load crystal structure from CIF, POSCAR, or other file
         cryst = Crystal.from_file(name)
@@ -406,7 +416,8 @@ if __name__ == '__main__':
             all_types=all_types, n_workers=n_workers,
             near_gap_threshold=near_gap_threshold,
             primary_only=primary_only, n_images=n_images,
-            summary_out=summary_out, symmetrized=symmetrize)
+            summary_out=summary_out, symmetrized=symmetrize,
+            filter_dir=filter_dir)
     else:
         print(f"Unknown crystal: {name}")
         print(f"Built-in structures: {', '.join(CRYSTALS)}")

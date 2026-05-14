@@ -11,7 +11,7 @@ Two algorithms are provided:
    of all pre-computed resolutions.  Kept for backward compatibility.
 """
 
-from itertools import product
+from itertools import product, combinations
 from collections import defaultdict
 from math import prod
 from .resolution import enumerate_resolutions
@@ -260,43 +260,47 @@ def _classify_combo(combo, orbit_size, generic_tets, vertex_options,
 
 def enumerate_cell_types_v2(vertices, central_idx, coords, verbose=True,
                             include_degenerate=False, crystal=None,
-                            n_workers=1, primary_only=False):
-    """Enumerate all Voronoi cell types via incremental star construction.
+                            n_workers=1, primary_only=False,
+                            subset_enumeration=True, max_subset_per_vertex=8):
+    """Enumerate all Voronoi cell types, with per-vertex full subset
+    enumeration to capture all configurations reachable under
+    perturbations σ < near_gap_threshold · circumradius.
 
-    Algorithm:
-      1. At each degenerate vertex, enumerate ALL resolutions of the full
-         point configuration (all equidistant atoms present).
-      2. Build vertex_options: for each degenerate vertex, a list of
-         (frozenset_of_tets, is_unresolved) pairs.
-      3. Incrementally construct global stars one vertex at a time,
-         merging each vertex's resolution choices with existing stars
-         via frozenset union, and deduplicating identical stars at
-         each step.
-      4. (Optional) If the crystal structure is provided, use site
-         symmetry to group equivalent stars and classify only one
-         representative per orbit.
+    Algorithm (per-vertex C(k,4)+):
+      For each degenerate vertex with k_total atoms in its
+      equidistant set (core + borderline as found by analyze_voronoi),
+      enumerate every subset of size 4..k_total (since a 3D Voronoi
+      vertex is generically defined by 4 atoms, and larger sizes
+      capture cases where more atoms remain near-equidistant under
+      the perturbation, splitting into multiple 4-fold sub-vertices).
+      For each subset, call ``enumerate_resolutions`` and collect
+      the resulting stars.  The union across all subsets at a vertex
+      is that vertex's set of options.
 
-    Note: atoms are NOT removed from the point configuration.  The
-    presence of an atom constrains the triangulation space even when
-    it is not in the star of the central atom.
+    The downstream orderly DFS combines per-vertex options into
+    global stars and classifies each via Weinberg vector.
 
     Parameters
     ----------
     vertices : list of VoronoiVertex
-    central_idx : int
-    coords : ndarray, shape (M, 3)
-    verbose : bool
-    include_degenerate : bool
-        If True, include an unresolved option for each degenerate vertex
-        (keeping it as a single higher-valence Voronoi vertex).  This
-        enumerates all cell types including those with degenerate vertices.
-    crystal : Crystal, optional
-        If provided, site symmetry is computed and used to reduce the
-        number of stars that need classification.
+        Vertices with ``core_atom_indices`` and
+        ``borderline_atom_indices`` populated.
+    subset_enumeration : bool
+        If True (default), do per-vertex C(k,4)+ enumeration when
+        any borderline atoms are present.  If False, falls back to
+        the original "all atoms in the equidistant set participate"
+        behavior.
+    max_subset_per_vertex : int
+        Safety guard: cap k_total at this value per vertex.  If a
+        vertex's k_total exceeds the cap, fall back to the single
+        full-set enumeration for that vertex (filter may be
+        incomplete for that vertex).  Default 8 → ≤ 163 subsets
+        per vertex.
+    Other parameters as before.
 
     Returns
     -------
-    cell_types : dict
+    cell_types : dict, keyed by canonical Weinberg vector.
     """
     generic = [v for v in vertices if not v.is_degenerate]
     degen = [v for v in vertices if v.is_degenerate]
@@ -309,44 +313,114 @@ def enumerate_cell_types_v2(vertices, central_idx, coords, verbose=True,
     vertex_options = []
 
     for v in degen:
-        order = [central_idx] + [a for a in v.atom_indices
-                                 if a != central_idx]
-        pts = coords[order]
-        resolutions, _ = enumerate_resolutions(pts, central=0)
+        all_atoms = [a for a in v.atom_indices if a != central_idx]
+        k_total = len(all_atoms)
 
-        if primary_only:
-            n_before = len(resolutions)
-            resolutions = [r for r in resolutions if r.is_primary]
-            if verbose:
-                print(f"  Vertex ({len(order)} atoms): "
-                      f"{len(resolutions)}/{n_before} primary resolutions")
+        # Decide whether to do subset enumeration for this vertex.
+        # We skip subset enumeration if:
+        #   - subset_enumeration is False
+        #   - the vertex has no borderline atoms (all are core)
+        #   - k_total exceeds the safety cap
+        do_subsets = (subset_enumeration
+                      and v.has_borderline
+                      and k_total <= max_subset_per_vertex)
 
-        opts = []
-        for res in resolutions:
-            mapped = frozenset(
-                tuple(sorted(order[j] for j in tet))
-                for tet in res.star
-            )
-            opts.append((mapped, False))
-
-        # Add unresolved option for --all-types
-        if include_degenerate and resolutions:
-            all_local_nbrs = set(range(1, len(order)))
-            best_star = None
+        if not do_subsets:
+            # Original behavior: enumerate one full-set resolution.
+            order = [central_idx] + all_atoms
+            pts = coords[order]
+            resolutions, _ = enumerate_resolutions(pts, central=0)
+            if primary_only:
+                resolutions = [r for r in resolutions if r.is_primary]
+            opts = []
             for res in resolutions:
-                if set(res.neighbors) == all_local_nbrs:
+                mapped = frozenset(
+                    tuple(sorted(order[j] for j in tet))
+                    for tet in res.star
+                )
+                opts.append((mapped, False))
+
+            if include_degenerate and resolutions:
+                all_local_nbrs = set(range(1, len(order)))
+                best_star = None
+                for res in resolutions:
+                    if set(res.neighbors) == all_local_nbrs:
+                        best_star = frozenset(
+                            tuple(sorted(order[j] for j in tet))
+                            for tet in res.star
+                        )
+                        break
+                if best_star is None:
+                    best_res = max(resolutions,
+                                   key=lambda r: len(r.neighbors))
                     best_star = frozenset(
                         tuple(sorted(order[j] for j in tet))
-                        for tet in res.star
+                        for tet in best_res.star
                     )
-                    break
-            if best_star is None:
-                best_res = max(resolutions, key=lambda r: len(r.neighbors))
-                best_star = frozenset(
-                    tuple(sorted(order[j] for j in tet))
-                    for tet in best_res.star
-                )
-            opts.append((best_star, True))
+                opts.append((best_star, True))
+        else:
+            # Per-vertex C(k,4)+ subset enumeration: iterate every
+            # subset of size 3..k_total of the non-central equidistant
+            # atoms.  Adding central, that's a (size+1)-point cocircular
+            # configuration.  size=3 gives 4 atoms total = a generic
+            # 4-fold sub-vertex (one trivial tet star) — this captures
+            # the case where "one borderline atom doesn't participate",
+            # which is necessary for monotonicity in near_gap_threshold.
+            # Larger sizes capture higher-fold degeneracies preserved
+            # under specific perturbation directions.
+            star_set = set()
+            full_set_resolutions = None
+            for size in range(3, k_total + 1):
+                for subset_idx in combinations(range(k_total), size):
+                    subset_atoms = [all_atoms[i] for i in subset_idx]
+                    order = [central_idx] + subset_atoms
+                    pts = coords[order]
+                    resolutions, _ = enumerate_resolutions(pts, central=0)
+                    if size == k_total:
+                        # Keep the full-set resolutions and their order
+                        # for the optional unresolved-option construction.
+                        full_set_resolutions = (resolutions, order)
+                    if primary_only:
+                        resolutions = [r for r in resolutions
+                                       if r.is_primary]
+                    for res in resolutions:
+                        mapped = frozenset(
+                            tuple(sorted(order[j] for j in tet))
+                            for tet in res.star
+                        )
+                        star_set.add(mapped)
+            opts = [(s, False) for s in star_set]
+
+            # Add unresolved option for --all-types: the cell with this
+            # vertex kept as a single multi-edge face (no 4-fold split).
+            # Built from the full-set resolution with the most neighbors,
+            # matching the behavior of the non-subset branch.
+            if include_degenerate and full_set_resolutions is not None:
+                resolutions, order = full_set_resolutions
+                if resolutions:
+                    all_local_nbrs = set(range(1, len(order)))
+                    best_star = None
+                    for res in resolutions:
+                        if set(res.neighbors) == all_local_nbrs:
+                            best_star = frozenset(
+                                tuple(sorted(order[j] for j in tet))
+                                for tet in res.star
+                            )
+                            break
+                    if best_star is None:
+                        best_res = max(resolutions,
+                                       key=lambda r: len(r.neighbors))
+                        best_star = frozenset(
+                            tuple(sorted(order[j] for j in tet))
+                            for tet in best_res.star
+                        )
+                    opts.append((best_star, True))
+
+            if verbose:
+                n_sub = sum(1 for size in range(3, k_total + 1)
+                            for _ in combinations(range(k_total), size))
+                print(f"  Vertex (k_total={k_total}): "
+                      f"{n_sub} subsets → {len(opts)} unique stars")
 
         vertex_options.append(opts)
 
