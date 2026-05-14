@@ -31,20 +31,20 @@ voronoi_core
 *.eam.alloy
 *.meam.spline
 
-# Generated supercell structures (reproducible from build_*.py)
-A15_Nb3Sn_*x*x*.cif
-AgPt_*x*x*.cif
-AlCu3_*x*x*.cif
-C15_MgCu2_*x*x*.cif
-Sigma_CrFe_*x*x*.cif
+# Loose CIF/filter files at repo root (curated examples live in examples/ and filters/)
+/*.cif
+/*.filter
 
-# MD output / large analysis dirs
+# MD / LAMMPS inputs and outputs
+*.in
 dumps_mgcu2/
 cifs_798/
 omega_polycrystal_grain_id.txt
 thermo.txt
 *.tsv
 
-# Render artifacts / scratch outputs
+# LaTeX sources and render artifacts / scratch outputs
+*.tex
 palette_*.png
 primary.pdf
+*.pdf
