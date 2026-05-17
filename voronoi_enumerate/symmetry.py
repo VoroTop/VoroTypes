@@ -355,17 +355,35 @@ def compute_site_symmetry(crystal, central_idx, coords, degen_vertices,
 
     for op in ops:
         R = op.rotation_matrix
+        t = op.translation_vector
 
-        # Check: does this operation fix the central atom?
-        rotated_central = R @ central_pos
-        if np.linalg.norm(rotated_central - central_pos) > 1e-6:
+        # Does the full space-group operation x -> R x + t fix the central
+        # atom, modulo a unit-cell lattice translation?  Testing only the
+        # rotation part (R x ~ x) silently drops the translation, so every
+        # operation with a non-zero t -- screw axes, glide planes, and the
+        # site symmetry of any atom not sitting at the coordinate origin --
+        # is missed.  That under-counts the site-symmetry group: it never
+        # makes results wrong (a smaller group only means less pruning of
+        # equivalent combinations), but it makes the enumeration slower.
+        delta = R @ central_pos + t - central_pos
+        delta_frac = lattice.get_fractional_coords(delta)
+        residual = lattice.get_cartesian_coords(
+            delta_frac - np.round(delta_frac))
+        if np.linalg.norm(residual) > 1e-6:
             continue
+
+        # The crystal operation that fixes the central atom *exactly* is the
+        # rotation R about the central atom's position: g(x) = R(x - c) + c.
+        # It equals x -> R x + t composed with the compensating lattice
+        # translation, so it is a genuine space-group symmetry, and it is
+        # the operation whose action on the local Voronoi structure we need.
+        # (When c is the origin this reduces to the old g(x) = R x.)
 
         # Compute vertex permutation
         vperm = []
         ok = True
         for pos in degen_pos:
-            rotated = R @ pos
+            rotated = R @ (pos - central_pos) + central_pos
             dists = np.linalg.norm(degen_pos - rotated, axis=1)
             j = int(np.argmin(dists))
             if dists[j] > 1e-6:
@@ -378,7 +396,7 @@ def compute_site_symmetry(crystal, central_idx, coords, degen_vertices,
         # Compute atom permutation for star atoms
         atom_perm = {}
         for ai in all_star_atoms:
-            rotated = R @ coords[ai]
+            rotated = R @ (coords[ai] - central_pos) + central_pos
             dists = np.linalg.norm(coords - rotated, axis=1)
             best = int(np.argmin(dists))
             if dists[best] > 1e-6:
