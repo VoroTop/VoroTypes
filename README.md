@@ -161,7 +161,7 @@ python enumerate_cells.py examples/TaN_mp-1279.cif --near-gap-threshold 0.01
 
 ### Pre-computed Filters
 
-A library of pre-computed filter files for 779 structures from the
+A library of pre-computed filter files for 1,121 structures from the
 [Materials Project](https://materialsproject.org/) is available at
 [vorotop.org/filter-library](https://www.vorotop.org/filter-library.html).
 
