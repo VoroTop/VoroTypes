@@ -140,22 +140,35 @@ Filter file written: TINI_MP-1048.filter (2 type(s), 2 Weinberg vectors)
 Total time: 0.1 seconds
 ```
 
-#### Tantalum nitride
+#### Tantalum nitride: reading the gap diagnostic
 
-An example with near-equidistant neighbors. Some atoms are almost
-(but not exactly) equidistant from a Voronoi vertex. The filter file
-includes a diagnostic warning:
+Every filter header records the structure's minimum relative gap --
+how much farther (relative to the vertex--atom distance) the nearest
+non-equidistant atom sits from a Voronoi vertex than the equidistant
+set:
 
 ```bash
 python enumerate_cells.py examples/TaN_mp-1279.cif
 ```
+```
+#   Min relative gap: 1.263186e-01
+```
 
-To extend the enumeration to cover perturbations that would bring
-near-equidistant atoms into play:
+Here the nearest such atom is ~13% farther away, comfortably beyond
+small perturbations, so the default filter is complete as computed.
+When the reported gap is small (below 1e-2 the header carries an
+explicit warning), regenerate with a threshold at least as large as
+the reported gap:
 
 ```bash
-python enumerate_cells.py examples/TaN_mp-1279.cif --near-gap-threshold 0.01
+python enumerate_cells.py structure.cif --near-gap-threshold 0.01
 ```
+
+This treats atoms within the threshold as borderline and enumerates
+every subset. For example, triclinic CoWO4 (mp-19092) reports a gap
+of 3.4e-03, and rerunning with `--near-gap-threshold 0.005` (the
+filter-library setting) grows its family from 6 to 20 Weinberg
+types.
 
 ---
 
@@ -174,6 +187,7 @@ The output is a VoroTop-compatible filter file:
 ```
 #   AL_MP-134 filter, computed by voronoi_enumerate
 #   Total Weinberg types: 2815
+#   Min relative gap: 7.320507e-01
 *   1   AL_MP-134   atoms [0]
 1   (1,2,3,4,5,3,6,7,8,9,10,8,11,12,...)
 1   (1,2,3,4,5,6,7,8,9,10,7,11,12,...)
@@ -188,9 +202,10 @@ For structures with near-equidistant neighbors (relative gap
 < 0.01), the filter includes a warning:
 
 ```
-#   WARNING: Near-equidistant neighbors detected (gap_rel=3.08e-07).
-#   For perturbations sigma > 3e-07, supplement with stochastic filter:
-#     VoroTop structure.xyz -mf 100000 <sigma>
+#   WARNING: Near-equidistant neighbors detected (gap_rel=3.1e-03).
+#   This filter may be incomplete for perturbations that close this gap; consider
+#   regenerating with --near-gap-threshold >= 3e-03, or supplement with a
+#   stochastic filter: VoroTop structure.xyz -mf 100000 <sigma>
 ```
 
 ---

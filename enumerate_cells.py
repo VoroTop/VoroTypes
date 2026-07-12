@@ -36,23 +36,26 @@ SUMMARY_COLUMNS = [
 
 
 def _vertex_min_gap_rel(v, coords):
-    """Perturbation safety margin (d_next - r) / (2r).
+    """Relative distance gap (d_next - r) / r at this vertex.
 
-    Returns the largest relative perturbation sigma/r for which no
-    non-equidistant atom can cross the perpendicular bisector and join
-    the equidistant set at this vertex.  An atom at distance d > r
-    crosses when both it and the central atom move by sigma toward each
-    other, i.e. sigma = (d - r) / 2, so sigma/r = (d - r) / (2 r).
+    The nearest non-equidistant atom sits (d_next - r) / r farther
+    from the vertex than the equidistant set -- the "X% farther"
+    quantity quoted in the papers (omega-Ti 0.34, MgCu2 0.50), and
+    the same convention as --near-gap-threshold: an atom is treated
+    as borderline when its relative gap is below tau, so raising tau
+    above the reported minimum gap brings the nearest such atom into
+    the enumeration.
 
-    This is the convention used in the paper for delta_min (e.g. the
-    MgCu2 0.247 and omega-Ti 0.34 figures in Sections 5.2 and 5.3).
+    The conservative safety margin against simultaneous two-sided
+    motion (the atom and the central atom each moving sigma toward
+    each other) is half this value: sigma/r = gap/2.
     """
     dists = np.linalg.norm(coords - v.position, axis=1)
     eq = set(v.atom_indices)
     non_eq = [d for i, d in enumerate(dists) if i not in eq]
     if not non_eq:
         return float('inf')
-    return (min(non_eq) - v.circumradius) / (2.0 * v.circumradius)
+    return (min(non_eq) - v.circumradius) / v.circumradius
 
 
 def _append_summary_row(path, row):
@@ -286,7 +289,9 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
         os.makedirs(filter_dir, exist_ok=True)
     filter_path = os.path.join(filter_dir, f"{name}.filter")
     n_wv, n_groups = write_filter_file(
-        filter_path, name, per_atom_types, species=cryst.species
+        filter_path, name, per_atom_types, species=cryst.species,
+        min_gap_rel=(min_gap_delta if min_gap_delta != float('inf')
+                     else None),
     )
     print(f"\nFilter file written: {filter_path} "
           f"({n_groups} type(s), {n_wv} Weinberg vectors)")

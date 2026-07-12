@@ -78,9 +78,12 @@ def write_filter_file(filepath, crystal_name, per_atom_types, species=None,
             if min_gap_rel < 1e-2:
                 f.write(f"#\tWARNING: Near-equidistant neighbors detected "
                         f"(gap_rel={min_gap_rel:.2e}).\n")
-                f.write(f"#\tFor perturbations sigma > {min_gap_rel:.0e}, "
-                        f"supplement with stochastic filter:\n")
-                f.write(f"#\t  VoroTop structure.xyz -mf 100000 <sigma>\n")
+                f.write(f"#\tThis filter may be incomplete for "
+                        f"perturbations that close this gap; consider\n")
+                f.write(f"#\tregenerating with --near-gap-threshold >= "
+                        f"{min_gap_rel:.0e}, or supplement with a\n")
+                f.write(f"#\tstochastic filter: "
+                        f"VoroTop structure.xyz -mf 100000 <sigma>\n")
         for i, tl in enumerate(type_labels):
             atoms_str = ",".join(str(a) for a in groups[i][0])
             f.write(f"*\t{i + 1}\t{tl}\tatoms [{atoms_str}]\n")
