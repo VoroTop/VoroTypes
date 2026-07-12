@@ -391,6 +391,15 @@ if __name__ == '__main__':
             max_memory = float(sys.argv[idx + 1])
     set_memory_limit(max_memory)
 
+    def _memory_abort(exc_type, exc, tb):
+        if exc_type is MemoryError:
+            print(f"\nERROR: memory limit exceeded "
+                  f"(--max-memory {max_memory} GB); aborting.",
+                  file=sys.stderr)
+            sys.exit(1)
+        sys.__excepthook__(exc_type, exc, tb)
+    sys.excepthook = _memory_abort
+
     filter_dir = '.'
     if '--filter-dir' in sys.argv:
         idx = sys.argv.index('--filter-dir')

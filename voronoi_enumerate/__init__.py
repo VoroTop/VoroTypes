@@ -9,6 +9,8 @@ Given a crystal structure, this package:
 4. Computes Weinberg vectors for the resulting Voronoi cell topologies
 """
 
+__version__ = "1.0.0"
+
 from .crystal import Crystal
 from .voronoi import analyze_voronoi, VoronoiVertex
 from .resolution import enumerate_resolutions, Resolution

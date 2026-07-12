@@ -36,7 +36,7 @@ topologies. VoroTypes finds all of them.
 #### Prerequisites
 
 - Python 3.10+
-- [pymatgen](https://pymatgen.org/) (for reading CIF/POSCAR files)
+- [pymatgen](https://pymatgen.org/) (structure input and space-group detection)
 
 #### Setup
 
@@ -79,7 +79,7 @@ python enumerate_cells.py <structure.cif> [options]
 | `--all-types` | Include partially resolved cell types (cells with some degenerate vertices left unresolved). |
 | `-j N` | Use N parallel worker processes. |
 | `--near-gap-threshold T` | Include near-equidistant atoms within a relative gap of T (see [Limitations](#limitations)). |
-| `--max-memory G` | Set memory limit in GB (default: 4). Aborts with a clear message if exceeded. |
+| `--max-memory G` | Address-space cap in GB (default: 4); the run aborts with a clear message if it is exceeded. Not supported on macOS, where a warning is printed and the run is uncapped. |
 | `--legacy` | Use the legacy Cartesian-product enumeration algorithm. |
 
 ---

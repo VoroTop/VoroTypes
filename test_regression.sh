@@ -1,6 +1,9 @@
 #!/bin/bash
-# Regression test: Python and C++ enumerators must produce bit-identical
-# .filter files for any single-site enumeration both can complete.
+# Regression test: Python and C++ enumerators must produce identical
+# .filter content (type labels + Weinberg vectors) for any single-site
+# enumeration both can complete.  '#' header comments are excluded from
+# the comparison: the Python writer records extra diagnostics (e.g. the
+# minimum relative gap) that the C++ core does not compute.
 #
 # C++ exclusive features (--count-only, --no-weinberg, --hash-count) are
 # not tested here because they have no Python equivalent by design.
@@ -35,13 +38,15 @@ run_case() {
         > "$TMP/cpp.log" 2>&1 || \
         { echo "  ERROR cpp: $label"; FAIL=$((FAIL+1)); return; }
 
-    if diff -q "$TMP/py.filter" "$TMP/cpp.filter" > /dev/null; then
+    if diff -q <(grep -v '^#' "$TMP/py.filter") \
+               <(grep -v '^#' "$TMP/cpp.filter") > /dev/null; then
         local n=$(grep -c '^[0-9]' "$TMP/py.filter")
         printf "  PASS: %-40s %5d types\n" "$label" "$n"
         PASS=$((PASS+1))
     else
         echo "  FAIL: $label"
-        diff "$TMP/py.filter" "$TMP/cpp.filter" | head -5
+        diff <(grep -v '^#' "$TMP/py.filter") \
+             <(grep -v '^#' "$TMP/cpp.filter") | head -5
         FAIL=$((FAIL+1))
     fi
 }
