@@ -67,16 +67,28 @@ def _face_valence(star, central, neighbor) -> int:
 
 
 def _classify_primary(points, star_to_tris, all_tris):
-    """Classify which star types are primary via the projected GKZ
-    secondary polytope.
+    """Classify which star types are primary: realized with positive
+    probability in the limit of vanishing perturbation.
 
-    The enumeration includes degenerate triangulations (with zero-volume
-    tetrahedra from co-planar atom subsets).  These are not proper
-    triangulations and only arise under measure-zero perturbations, so
-    they are excluded before the GKZ analysis.  Proper triangulations
-    of co-spherical points are regular and have unique GKZ vectors
-    (GKZ bijection theorem); their projected GKZ vectors are vertices
-    of the projected secondary polytope.
+    Proper triangulations (all tetrahedra of positive volume) are
+    analysed via the projected GKZ secondary polytope: proper
+    triangulations of co-spherical points are regular and have unique
+    GKZ vectors (GKZ bijection theorem); their projected GKZ vectors
+    are vertices of the projected secondary polytope.
+
+    Degenerate triangulations contain zero-volume tetrahedra built on
+    four co-planar points.  Whether such a tetrahedron survives a
+    generic small perturbation depends on where the co-planar
+    quadruple sits.  If other points of the configuration lie on both
+    sides of its plane (an interior quadruple, e.g. the equatorial
+    squares of the FCC octahedron), the perturbed tetrahedron is
+    Delaunay only when the perturbation lands in a window whose width
+    vanishes with the perturbation magnitude, so the star is secondary.
+    If all other points lie on one side (the quadruple is a facet of
+    the convex hull, e.g. the base of the omega-Ti square pyramid or a
+    face of the simple-cubic cube), the tetrahedron is realized by a
+    fixed positive fraction of perturbation directions, and a star
+    whose zero-volume tetrahedra all lie on hull facets is primary.
     """
     k = len(points)
 
@@ -140,7 +152,36 @@ def _classify_primary(points, star_to_tris, all_tris):
         if tri_key in tri_to_star:
             primary_stars.add(tri_to_star[tri_key])
 
+    # Stars containing zero-volume tetrahedra are primary when every
+    # such tetrahedron lies on a facet of the convex hull (see docstring).
+    for star in star_to_tris:
+        if star in primary_stars:
+            continue
+        flat = [s for s in star if _is_flat(points, s)]
+        if flat and all(_flat_on_hull_facet(points, s) for s in flat):
+            primary_stars.add(star)
+
     return primary_stars
+
+
+def _is_flat(points, simplex, tol=1e-12):
+    p = points[list(simplex)]
+    return abs(np.linalg.det(p[1:] - p[0])) <= tol
+
+
+def _flat_on_hull_facet(points, simplex, tol=1e-9):
+    """True if the plane of a co-planar quadruple has all other points
+    of the configuration on one (closed) side."""
+    p = points[list(simplex)]
+    n = np.cross(p[1] - p[0], p[2] - p[0])
+    if np.linalg.norm(n) < tol:
+        n = np.cross(p[1] - p[0], p[3] - p[0])
+    n = n / np.linalg.norm(n)
+    others = [i for i in range(len(points)) if i not in simplex]
+    if not others:
+        return True
+    d = (points[others] - p[0]) @ n
+    return not (np.any(d > tol) and np.any(d < -tol))
 
 
 def enumerate_resolutions(points, central=0, seed=42, verbose=False):
@@ -207,7 +248,9 @@ def enumerate_resolutions(points, central=0, seed=42, verbose=False):
         star = frozenset(s for s in simplices if central in s)
         star_to_tris[star].append(tri_key)
 
-    # Classify primary vs secondary via projected GKZ secondary polytope
+    # Classify primary vs secondary: proper triangulations via the projected
+    # GKZ secondary polytope; stars with zero-volume tetrahedra are primary
+    # when every such tetrahedron lies on a hull facet (degenerate edge).
     primary_stars = _classify_primary(points, star_to_tris,
                                       list(triangulations.keys()))
 

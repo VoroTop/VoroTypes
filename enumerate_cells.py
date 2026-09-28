@@ -8,6 +8,8 @@ Usage:
     python enumerate_cells.py structure.cif
     python enumerate_cells.py POSCAR --atoms 0
     python enumerate_cells.py structure.cif --max-memory 8
+    python enumerate_cells.py structure.cif --primary     # primary resolutions only (see README)
+    python enumerate_cells.py structure.cif --all-types   # also partially resolved cell types
 """
 
 import os

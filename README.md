@@ -76,6 +76,7 @@ python enumerate_cells.py <structure.cif> [options]
 | Option | Description |
 |--------|-------------|
 | `--atoms 0 2` | Enumerate only the specified atom indices (default: all atoms). |
+| `--primary` | Enumerate only primary resolutions: those realized with positive probability in the limit of vanishing perturbation. Zero-volume tetrahedra are admitted only when their four coplanar atoms form a degenerate edge of the Voronoi cell (all other equidistant atoms on one side of their plane); tetrahedra on coplanar sets with atoms on both sides are secondary and excluded. |
 | `--all-types` | Include partially resolved cell types (cells with some degenerate vertices left unresolved). |
 | `-j N` | Use N parallel worker processes. |
 | `--near-gap-threshold T` | Include near-equidistant atoms within a relative gap of T (see [Limitations](#limitations)). |
@@ -174,7 +175,7 @@ types.
 
 ### Pre-computed Filters
 
-A library of pre-computed filter files for 1,121 structures from the
+A library of pre-computed filter files for 1,088 structures from the
 [Materials Project](https://materialsproject.org/) is available at
 [vorotop.org/filter-library](https://www.vorotop.org/filter-library.html).
 
