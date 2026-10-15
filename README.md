@@ -243,6 +243,10 @@ the reference structure matches the one used in your simulation.
 
 ### Publications
 
+* Lazar, E.A. and Rycroft, C.H., "Structural identification in general
+  crystalline systems via Voronoi cell topology,"
+  [arXiv:2610.20498](https://arxiv.org/abs/2610.20498), 2026.
+
 * Lazar, E.A., Han, J., and Srolovitz, D.J., "A Topological Framework
   for Local Structure Analysis in Condensed Matter,"
   [Proc. Natl. Acad. Sci. 112:E5769](https://www.pnas.org/doi/10.1073/pnas.1505788112),
