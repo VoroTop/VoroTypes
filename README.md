@@ -243,6 +243,11 @@ the reference structure matches the one used in your simulation.
 
 ### Publications
 
+* Lazar, E.A. and Rycroft, C.H., "VoroTypes: automated enumeration of
+  Voronoi cell topologies for structural identification of complex
+  crystals in atomistic simulations,"
+  [arXiv:2610.21911](https://arxiv.org/abs/2610.21911), 2026.
+
 * Lazar, E.A. and Rycroft, C.H., "Structural identification in general
   crystalline systems via Voronoi cell topology,"
   [arXiv:2610.20498](https://arxiv.org/abs/2610.20498), 2026.
