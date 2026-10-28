@@ -7,9 +7,12 @@ Given a crystal structure, this package:
 2. Enumerates all regular triangulations (resolutions) at each degenerate vertex
 3. Combines compatible resolutions across vertices
 4. Computes Weinberg vectors for the resulting Voronoi cell topologies
+
+Two-dimensional crystals are handled by the planar module, which
+enumerates p-vectors.
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 from .crystal import Crystal
 from .voronoi import analyze_voronoi, VoronoiVertex
@@ -19,3 +22,4 @@ from .weinberg import weinberg_vector
 from .cell import star_to_faces, orient_faces
 from .combine import enumerate_cell_types, enumerate_cell_types_v2, classify_neighbors
 from .filter import write_filter_file
+from .planar import Crystal2D, enumerate_pvectors

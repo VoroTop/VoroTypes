@@ -1,0 +1,9 @@
+# Lieb lattice: a square lattice plus the midpoints of its edges.
+# Lines 1-2: lattice vectors a1 and a2 (Cartesian).
+# Remaining lines: fractional coordinates of each atom, with an
+# optional species label used to name the types in the filter.
+1.0  0.0
+0.0  1.0
+0.0  0.0   corner
+0.5  0.0   edge
+0.0  0.5   edge

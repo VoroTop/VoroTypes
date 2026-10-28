@@ -1,0 +1,6 @@
+# Rectangular lattice with aspect ratio 1.5.  Its Delaunay subdivision
+# has the same combinatorics as the square lattice's, so its filter is
+# the same as square.filter.
+1.0  0.0
+0.0  1.5
+0.0  0.0

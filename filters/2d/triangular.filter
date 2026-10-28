@@ -1,0 +1,6 @@
+#	triangular filter, computed by voronoi_enumerate
+#	Two-dimensional filter: use with VoroTop -2
+#	Total p-vector types: 1
+#	Min relative gap: 1.000000e+00
+*	1	triangular	atoms [0]
+1	(6,6,6,6,6,6,6)

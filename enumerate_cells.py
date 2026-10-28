@@ -10,6 +10,8 @@ Usage:
     python enumerate_cells.py structure.cif --max-memory 8
     python enumerate_cells.py structure.cif --primary     # primary resolutions only (see README)
     python enumerate_cells.py structure.cif --all-types   # also partially resolved cell types
+    python enumerate_cells.py -2 square                   # two-dimensional crystal
+    python enumerate_cells.py -2 crystal2d.txt            # 2D crystal from a text file
 """
 
 import os
@@ -26,6 +28,9 @@ from voronoi_enumerate.combine import (
     summarize_cell_types, classify_neighbors,
 )
 from voronoi_enumerate.filter import write_filter_file
+from voronoi_enumerate.planar import (
+    Crystal2D, CRYSTALS_2D, enumerate_pvectors,
+)
 
 
 SUMMARY_COLUMNS = [
@@ -335,8 +340,49 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
         print(f"Summary row appended to {summary_out}")
 
 
+def run_2d(name, cryst, atom_indices=None, all_types=False,
+           filter_dir='.'):
+    """Enumerate the p-vectors of a two-dimensional crystal."""
+    t0 = time.time()
+    print(f"Two-dimensional crystal: {name}")
+    print(f"Atoms per unit cell: {cryst.n_atoms}")
+    print(f"Species: {cryst.species}")
+    print(f"Lattice:\n{cryst.lattice}\n")
+
+    if atom_indices is None:
+        atom_indices = list(range(cryst.n_atoms))
+
+    min_gap = float('inf')
+    per_atom_types = []
+    for atom_idx in atom_indices:
+        print("=" * 65)
+        print(f"Atom {atom_idx}")
+        print("=" * 65)
+        pvectors, info = enumerate_pvectors(
+            cryst, atom_index=atom_idx, all_types=all_types)
+        min_gap = min(min_gap, info['min_gap_rel'])
+        print(f"p-vectors: {len(pvectors)}\n")
+        per_atom_types.append((atom_idx, {pv: {} for pv in pvectors}))
+
+    if filter_dir and filter_dir != '.':
+        os.makedirs(filter_dir, exist_ok=True)
+    filter_path = os.path.join(filter_dir, f"{name}.filter")
+    n_pv, n_groups = write_filter_file(
+        filter_path, name, per_atom_types, species=cryst.species,
+        min_gap_rel=(min_gap if min_gap != float('inf') else None),
+        dimension=2,
+    )
+    print(f"Filter file written: {filter_path} "
+          f"({n_groups} type(s), {n_pv} p-vectors)")
+    print(f"\nTotal time: {time.time() - t0:.1f} seconds")
+
+
 if __name__ == '__main__':
     import os
+
+    two_d = '-2' in sys.argv
+    if two_d:
+        sys.argv.remove('-2')
 
     name = sys.argv[1] if len(sys.argv) > 1 else 'fcc'
 
@@ -408,7 +454,29 @@ if __name__ == '__main__':
         if idx + 1 < len(sys.argv):
             filter_dir = sys.argv[idx + 1]
 
-    if name in CRYSTALS:
+    if two_d:
+        if near_gap_threshold is not None or legacy or symmetrize:
+            print("--near-gap-threshold, --legacy and --symmetrize are "
+                  "not available for two-dimensional crystals.")
+            sys.exit(1)
+        if primary_only:
+            print("Note: in two dimensions every triangulation of a "
+                  "degenerate vertex is primary,\nso --primary gives the "
+                  "same filter as the default mode.\n")
+        if name in CRYSTALS_2D:
+            cryst2d = CRYSTALS_2D[name]()
+            label = name
+        elif os.path.isfile(name):
+            cryst2d = Crystal2D.from_file(name)
+            label = os.path.splitext(os.path.basename(name))[0]
+        else:
+            print(f"Unknown two-dimensional crystal: {name}")
+            print(f"Built-in 2D structures: {', '.join(CRYSTALS_2D)}")
+            print("Or provide a 2D crystal text file (see README).")
+            sys.exit(1)
+        run_2d(label, cryst2d, atom_indices=atom_indices,
+               all_types=all_types, filter_dir=filter_dir)
+    elif name in CRYSTALS:
         if symmetrize:
             cryst = CRYSTALS[name]().symmetrized(symprec=symprec)
             CRYSTALS[name] = lambda c=cryst: c

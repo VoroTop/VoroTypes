@@ -1,22 +1,23 @@
 """
 Write VoroTop-compatible filter files.
 
-A filter file maps Weinberg vectors to crystal type indices, allowing
-VoroTop to classify particles in atomistic simulations.
+A filter file maps topology vectors to crystal type indices, allowing
+VoroTop to classify particles in atomistic simulations.  Topologies are
+Weinberg vectors in three dimensions and p-vectors in two.
 
 Format:
     #<TAB><comment>
     *<TAB><type_index><TAB><type_name>
-    <type_index><TAB>(<comma-separated Weinberg vector>)
+    <type_index><TAB>(<comma-separated topology vector>)
 
 For multi-atom unit cells, each inequivalent site gets its own type
-index.  Atoms that produce identical Weinberg vector sets are merged
-into a single type.
+index.  Atoms that produce identical vector sets are merged into a
+single type.
 """
 
 
 def write_filter_file(filepath, crystal_name, per_atom_types, species=None,
-                      min_gap_rel=None):
+                      min_gap_rel=None, dimension=3):
     """Write a VoroTop filter file from enumerated cell types.
 
     Parameters
@@ -34,7 +35,11 @@ def write_filter_file(filepath, crystal_name, per_atom_types, species=None,
     min_gap_rel : float, optional
         Minimum relative gap to nearest non-equidistant atom across all
         vertices and atoms.  Used to warn about near-equidistant neighbors.
+    dimension : int, optional
+        3 (default) for Weinberg vectors; 2 for p-vectors of a planar
+        crystal, to be used with VoroTop's -2 option.
     """
+    vector_name = "Weinberg" if dimension == 3 else "p-vector"
     label = crystal_name
 
     # Group atoms that produce identical Weinberg vector sets
@@ -72,7 +77,9 @@ def write_filter_file(filepath, crystal_name, per_atom_types, species=None,
 
     with open(filepath, 'w') as f:
         f.write(f"#\t{label} filter, computed by voronoi_enumerate\n")
-        f.write(f"#\tTotal Weinberg types: {total_wv}\n")
+        if dimension == 2:
+            f.write("#\tTwo-dimensional filter: use with VoroTop -2\n")
+        f.write(f"#\tTotal {vector_name} types: {total_wv}\n")
         if min_gap_rel is not None:
             f.write(f"#\tMin relative gap: {min_gap_rel:.6e}\n")
             if min_gap_rel < 1e-2:
@@ -80,10 +87,14 @@ def write_filter_file(filepath, crystal_name, per_atom_types, species=None,
                         f"(gap_rel={min_gap_rel:.2e}).\n")
                 f.write(f"#\tThis filter may be incomplete for "
                         f"perturbations that close this gap; consider\n")
-                f.write(f"#\tregenerating with --near-gap-threshold >= "
-                        f"{min_gap_rel:.0e}, or supplement with a\n")
-                f.write(f"#\tstochastic filter: "
-                        f"VoroTop structure.xyz -mf 100000 <sigma>\n")
+                if dimension == 3:
+                    f.write(f"#\tregenerating with --near-gap-threshold >= "
+                            f"{min_gap_rel:.0e}, or supplement with a\n")
+                    f.write(f"#\tstochastic filter: "
+                            f"VoroTop structure.xyz -mf 100000 <sigma>\n")
+                else:
+                    f.write(f"#\tsupplementing it with a stochastic filter: "
+                            f"VoroTop structure.dump -2 -mf 100000 <sigma>\n")
         for i, tl in enumerate(type_labels):
             atoms_str = ",".join(str(a) for a in groups[i][0])
             f.write(f"*\t{i + 1}\t{tl}\tatoms [{atoms_str}]\n")

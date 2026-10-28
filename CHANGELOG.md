@@ -1,5 +1,38 @@
 # Changelog
 
+## v1.2 (2026-10-29)
+
+### Two-dimensional crystals
+
+New option `-2` enumerates the Voronoi cell topologies of a
+two-dimensional crystal and writes a filter of p-vectors for VoroTop's
+`-2` option.
+
+* `voronoi_enumerate/planar.py`: planar crystals (`Crystal2D`, built-in
+  `square`, `triangular`, `honeycomb`, `kagome`, `lieb`, and a plain-text
+  input format), polygon dissections, and the two-stage enumeration of
+  p-vectors.
+* Degenerate vertices are resolved by triangulations (default) or by
+  arbitrary dissections (`--all-types`) of the inscribed polygon.
+  `--primary` is accepted and equals the default mode.
+* `filters/2d/`: pre-computed filters for the triangular (1 p-vector),
+  square (1,261), Lieb (55) and kagome (176,128) lattices.
+  The honeycomb lattice is documented but not included: its family is
+  too large for a practical filter.
+* `examples/2d/`: input files for the Lieb and rectangular lattices.
+* `test_2d.py`: regression tests for dissection counts, family sizes,
+  site equivalence, and the shipped filters.
+* `filter.py`: `write_filter_file` takes `dimension=2` to label p-vector
+  filters.
+
+Validation: every p-vector observed in perturbed square, Lieb and kagome
+crystals (VoroTop `-2 -mf`, and an independent Delaunay sampler) is in
+the enumerated family; the square and Lieb families are recovered in
+full by sampling; random joint triangulations of all degenerate
+vertices in square, Lieb, kagome and honeycomb patches were realized
+by explicit perturbations; and VoroTop classifies every particle of
+perturbed square, Lieb and kagome crystals using the new filters.
+
 ## v1.1 (2026-09-28)
 
 ### Corrected primary/secondary classification
