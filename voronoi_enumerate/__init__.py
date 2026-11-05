@@ -12,7 +12,7 @@ Two-dimensional crystals are handled by the planar module, which
 enumerates p-vectors.
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 from .crystal import Crystal
 from .voronoi import analyze_voronoi, VoronoiVertex

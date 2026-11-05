@@ -115,8 +115,11 @@ def circumcenter_3d(pts):
     return center, radius
 
 
+MAX_IMAGES = 12   # refuse to grow the supercell beyond this (a 25^3 cell block)
+
+
 def analyze_voronoi(crystal, atom_index=0, n_images=3, tol=1e-8,
-                    near_gap_threshold=None):
+                    near_gap_threshold=None, check_supercell=True):
     """Compute Voronoi vertices and detect degeneracies.
 
     Parameters
@@ -130,6 +133,10 @@ def analyze_voronoi(crystal, atom_index=0, n_images=3, tol=1e-8,
         Absolute tolerance for circumcenter clustering and equidistance.
         Only used as a floor; the adaptive algorithm typically computes
         a larger effective tolerance from the gap structure in the data.
+    check_supercell : bool
+        Verify that the supercell is large enough for the computed cell to
+        be exact (the sufficiency bound of the companion paper, Supplementary Section S1.1),
+        and rebuild it with more images if not.
     near_gap_threshold : float, optional
         If set, atoms whose relative gap (d - r) / r to a vertex is below
         this threshold are treated as equidistant, even if the adaptive
@@ -211,7 +218,47 @@ def analyze_voronoi(crystal, atom_index=0, n_images=3, tol=1e-8,
             borderline_atom_indices=borderline,
         ))
 
+    if check_supercell and vertices:
+        n_required = required_images(crystal, vertices, coords[central_idx])
+        if n_required > n_images:
+            # A truncated cell overestimates R_max, so grow the supercell
+            # stepwise (at most doubling) and re-check on the larger cell.
+            if n_images >= MAX_IMAGES:
+                raise RuntimeError(
+                    f"The Voronoi cell of atom {atom_index} is not exact even "
+                    f"in a supercell of +/-{MAX_IMAGES} images: the unit cell "
+                    f"is too oblique or sparse.  Try --symmetrize, which "
+                    f"standardizes the cell, or --n-images with a larger value.")
+            n_new = min(n_required, 2 * n_images, MAX_IMAGES)
+            print(f"Supercell of +/-{n_images} images is insufficient for the "
+                  f"cell of atom {atom_index}; rebuilding with +/-{n_new}.")
+            return analyze_voronoi(crystal, atom_index=atom_index,
+                                   n_images=n_new, tol=tol,
+                                   near_gap_threshold=near_gap_threshold,
+                                   check_supercell=True)
+
     return vertices, central_idx, coords, images
+
+
+def required_images(crystal, vertices, p0):
+    """Smallest image count that guarantees an exact Voronoi cell.
+
+    Every atom that can bound the cell of p0 lies within 2 R_max of p0,
+    where R_max is the distance from p0 to its farthest Voronoi vertex,
+    and an atom at that distance lies at most ceil(2 R_max / h_j) unit
+    cells away along the j-th face normal, h_j being the perpendicular
+    spacing between the unit-cell faces spanned by the other two lattice
+    vectors (companion paper, Supplementary Section S1.1).  A supercell that is too small
+    can only enlarge the computed cell, never shrink it, so evaluating
+    the bound on the computed cell is sufficient: if it holds, the cell
+    is exact.
+    """
+    r_max = max(float(np.linalg.norm(v.position - p0)) for v in vertices)
+    L = np.asarray(crystal.lattice, dtype=float)
+    volume = abs(float(np.linalg.det(L)))
+    h = [volume / np.linalg.norm(np.cross(L[(j + 1) % 3], L[(j + 2) % 3]))
+         for j in range(3)]
+    return max(int(np.ceil(2.0 * r_max / hj - 1e-12)) for hj in h)
 
 
 def _find_equidistant(dists, radius, tol, near_gap_threshold=None):

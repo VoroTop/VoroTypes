@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.3 (2026-11-05)
+
+### Supercell-sufficiency check
+
+* `analyze_voronoi` now evaluates the supercell-sufficiency bound of the
+  companion paper (Supplementary Section S1.1), N_j = ceil(2 R_max / h_j),
+  on the computed Voronoi cell and enlarges the supercell (at most doubling
+  the image count, up to +/-12) when the bound requires it.  A too-small
+  supercell can only enlarge the computed cell, so the check is
+  conservative.  The default of +/-3 images satisfies the bound for every
+  structure in the filter library (largest ratio 2.14), so no library
+  result changes.
+* New `test_supercell.py`: FCC in a strongly sheared basis is rebuilt to
+  the standard cell.
+* README: documents `--n-images`.
+
 ## v1.2 (2026-10-29)
 
 ### Two-dimensional crystals
