@@ -86,7 +86,7 @@ python enumerate_cells.py <structure.cif> [options]
 | `--all-types` | Include partially resolved cell types (cells with some degenerate vertices left unresolved). |
 | `-j N` | Use N parallel worker processes. |
 | `--near-gap-threshold T` | Include near-equidistant atoms within a relative gap of T (see [Limitations](#limitations)). |
-| `--n-images N` | Periodic images of the unit cell in each direction for the Voronoi analysis (default: 3). The program checks the computed cell against the supercell-sufficiency bound of the companion paper and enlarges the supercell automatically when the bound requires it, so the default rarely needs changing. |
+| `--n-images N` | Initial number of periodic images of the unit cell in each direction for the Voronoi analysis (default: 1). The program checks the computed cell against the supercell-sufficiency bound of the companion paper and enlarges the supercell until the bound holds, so the image count is determined by the bound and the option rarely needs setting. |
 | `--max-memory G` | Address-space cap in GB (default: 4); the run aborts with a clear message if it is exceeded. Not supported on macOS, where a warning is printed and the run is uncapped. |
 | `--legacy` | Use the legacy Cartesian-product enumeration algorithm. |
 

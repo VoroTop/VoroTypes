@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.4 (2026-11-15)
+
+### Supercell determined by the bound
+
+* The Voronoi analysis now starts from a supercell of +/-1 image and
+  enlarges it until the sufficiency bound holds, instead of starting from
+  a fixed +/-3.  No arbitrary image count enters; `--n-images` sets only
+  the starting value.
+* `required_images` requires the supercell to contain every atom within
+  3 R_max of the central atom (the companion paper's 2 R_max for an exact
+  cell, plus R_max so that the near-gap diagnostics see every atom whose
+  relative gap to a vertex is below 100%).  Reported minimum gaps are
+  therefore exact whenever they matter.
+* `enumerate_cells.py` prints the image count actually used for each
+  atom and records the largest in the summary.
+* Verified on all 1,300 library candidates (raw and symmetrized cells):
+  Voronoi vertices, equidistant sets, and reported minimum gaps identical
+  to the +/-3 results, except for floating-point-level differences at
+  vertices that are near-degenerate below 1e-5 (where the Delaunay
+  triangulation itself depends on the point set) and one oblique raw cell
+  whose gaps the old +/-3 supercell had overstated.  Regenerated filters
+  are identical to the deployed library.  Voronoi stage about 2.5x faster.
+
 ## v1.3 (2026-11-05)
 
 ### Supercell-sufficiency check

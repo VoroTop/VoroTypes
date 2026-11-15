@@ -156,7 +156,7 @@ CRYSTALS = {
 
 def run(name, atom_indices=None, legacy=False, all_types=False,
         n_workers=1, near_gap_threshold=None, primary_only=False,
-        n_images=3, summary_out=None, symmetrized=False, notes='',
+        n_images=1, summary_out=None, symmetrized=False, notes='',
         filter_dir='.'):
     t0 = time.time()
 
@@ -165,7 +165,8 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
     print(f"Atoms per unit cell: {cryst.n_atoms}")
     print(f"Species: {cryst.species}")
     print(f"Lattice:\n{cryst.lattice}\n")
-    print(f"Supercell images: +/-{n_images} in each direction")
+    print(f"Supercell: starting from +/-{n_images} images, enlarged as the "
+          f"sufficiency bound requires")
 
     if atom_indices is None:
         atom_indices = list(range(cryst.n_atoms))
@@ -173,6 +174,8 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
     # Track the smallest relative gap across every vertex of every atom;
     # this is the limiting near-equidistant scale for the filter.
     min_gap_delta = float('inf')
+    # Largest supercell actually used (the bound may enlarge it per atom).
+    n_images_used = n_images
 
     # Collect cell types from all atoms for filter file output
     # Each entry is (atom_index, cell_types_dict)
@@ -187,6 +190,9 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
             n_images=n_images,
             near_gap_threshold=near_gap_threshold,
         )
+        n_used = max(abs(k) for img in images for k in img.image)
+        n_images_used = max(n_images_used, n_used)
+        print(f"Supercell: +/-{n_used} images (sufficiency bound)")
 
         for v in vertices:
             gap = _vertex_min_gap_rel(v, coords)
@@ -329,7 +335,7 @@ def run(name, atom_indices=None, legacy=False, all_types=False,
             'max_family': max_family,
             'min_gap_delta': (f'{min_gap_delta:.6e}'
                               if min_gap_delta != float('inf') else 'inf'),
-            'n_images': n_images,
+            'n_images': n_images_used,
             'near_gap_threshold': (near_gap_threshold
                                     if near_gap_threshold is not None
                                     else ''),
@@ -413,7 +419,7 @@ if __name__ == '__main__':
         if idx + 1 < len(sys.argv):
             near_gap_threshold = float(sys.argv[idx + 1])
 
-    n_images = 3
+    n_images = 1
     if '--n-images' in sys.argv:
         idx = sys.argv.index('--n-images')
         if idx + 1 < len(sys.argv):
